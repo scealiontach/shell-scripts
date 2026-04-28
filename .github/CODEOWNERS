@@ -1,8 +1,2 @@
-# Default owners
-* @catenasys/btp-engineering
-
-# Documentation has additional team to review
-/docs/* @catenasys/btp-engineering @catenasys/btp-documentation
-
-# Repository Admin only for .github
-/.github/* @catenasys/repository-admin
+# Repository owner — required reviewer for all PRs
+* @scealiontach
