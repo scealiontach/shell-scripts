@@ -20,8 +20,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 @include k8s
 
 function start() {
-  local cluster=$1
-  echo @startuml "$ns"
+  local cluster=${1:?}
+  echo @startuml "$cluster"
   cat <<EOF
 ' Azure
 !define AzurePuml https://raw.githubusercontent.com/RicardoNiepel/Azure-PlantUML/release/2-1/dist
@@ -88,7 +88,7 @@ function getChildren() {
   local pumlTypeParent=$5
   local pumlTypeChild=$6
   local extra=$7
-  select=$(kubectl describe -n "$ns" \
+  select=$(k8s::ctl describe -n "$ns" \
     "$parentType" "$res" | grep "^Selector:" | awk '{print $NF}')
   echo \'"$ns" "$parentType" "$res" Selector "$childType" "$select"
   if [ "$select" = '<none>' ]; then
@@ -112,7 +112,7 @@ EOF
 }
 
 function getNamespaces() {
-  kubectl get ns -o name | awk -F/ '{print $2}' | grep -v "^kube-\|openebs"
+  k8s::ctl get ns -o name | awk -F/ '{print $2}' | grep -v "^kube-\|openebs"
 }
 
 function namespace() {
@@ -121,38 +121,38 @@ function namespace() {
   cat <<EOF
   Namespace_Boundary(ns_${clean_ns},"$ns") {
 EOF
-  for item in $(getItems "$ns" ingress); do
-    item Ing "$ns" "$item"
+  for entry in $(getItems "$ns" ingress); do
+    item Ing "$ns" "$entry"
   done
-  for item in $(getItems "$ns" svc); do
-    item Svc "$ns" "$item"
+  for entry in $(getItems "$ns" svc); do
+    item Svc "$ns" "$entry"
   done
-  for item in $(getItems "$ns" ds); do
-    item Ds "$ns" "$item"
+  for entry in $(getItems "$ns" ds); do
+    item Ds "$ns" "$entry"
   done
-  for item in $(getItems "$ns" sts); do
-    item Sts "$ns" "$item"
+  for entry in $(getItems "$ns" sts); do
+    item Sts "$ns" "$entry"
   done
-  for item in $(getItems "$ns" deployment); do
-    item Deploy "$ns" "$item"
+  for entry in $(getItems "$ns" deployment); do
+    item Deploy "$ns" "$entry"
   done
-  for item in $(getItems "$ns" pod); do
-    item Pod "$ns" "$item"
+  for entry in $(getItems "$ns" pod); do
+    item Pod "$ns" "$entry"
   done
-  for item in $(getRs "$ns" replicaset); do
-    item Rs "$ns" "$item"
+  for entry in $(getRs "$ns" replicaset); do
+    item Rs "$ns" "$entry"
   done
-  for item in $(getItems "$ns" job); do
-    item Job "$ns" "$item"
+  for entry in $(getItems "$ns" job); do
+    item Job "$ns" "$entry"
   done
-  for item in $(getItems "$ns" cronjob); do
-    item Cronjob "$ns" "$item"
+  for entry in $(getItems "$ns" cronjob); do
+    item Cronjob "$ns" "$entry"
   done
-  # for item in $(getItems "$ns" cm); do
-  #   item Cm "$ns" "$item"
+  # for entry in $(getItems "$ns" cm); do
+  #   item Cm "$ns" "$entry"
   # done
-  # for item in $(getItems "$ns" secret|grep -v "token\|helm"); do
-  #   item Secret "$ns" "$item"
+  # for entry in $(getItems "$ns" secret|grep -v "token\|helm"); do
+  #   item Secret "$ns" "$entry"
   # done
   cat <<EOF
   }
