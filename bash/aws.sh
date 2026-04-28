@@ -95,7 +95,6 @@ function aws::scan_image {
 function _describe_findings {
   local repository=${1:?}
   local tag=${2:?}
-  local status
   aws::ecr describe-image-scan-findings "--repository-name=$repository" \
     --image-id imageTag="$tag" 2>/dev/null
 }
@@ -103,7 +102,6 @@ function _describe_findings {
 function aws::scan_status {
   local repository=${1:?}
   local tag=${2:?}
-  local status
   _describe_findings "$repository" "$tag" |
     _jq -r '.imageScanStatus.status'
 }
@@ -132,8 +130,9 @@ function aws::wait_for_scan_complete {
 function aws::list_findings {
   local repository=${1:?}
   local tag=${2:?}
+  # shellcheck disable=SC2016 # jq filter syntax: dollar names below are jq.
   _describe_findings "$repository" "$tag" |
-    jq -r '.imageScanFindings.findings[] |
+    _jq -r '.imageScanFindings.findings[] |
       (.severity + " " + .name + " " + .uri)'
 }
 
@@ -149,9 +148,13 @@ function aws::refresh_scan {
   earliest=$((now - seconds_ago))
   if aws::is_scan_complete "$repository" "$tag"; then
     local completedAt
+    # ECR returns imageScanCompletedAt as a float (e.g. 1728310921.123).
+    # POSIX `[ -lt ]` is integer-only, so the prior bare comparison
+    # spuriously failed and the cache was defeated. `floor` (jq >= 1.5)
+    # truncates to an integer for the comparison below.
     completedAt=$(_describe_findings "$repository" "$tag" |
-      _jq '.imageScanFindings.imageScanCompletedAt')
-    if [ $earliest -lt "$completedAt" ]; then
+      _jq -r '.imageScanFindings.imageScanCompletedAt | floor')
+    if [ "$earliest" -lt "$completedAt" ]; then
       log::info "Scan of $repository:$tag was done within $days_ago days"
       return
     else
