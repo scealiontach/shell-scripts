@@ -34,31 +34,31 @@ function ::get_includes() {
 
 function get_all_includes() {
   local target=${1:?}
-  declare -A checked
+  local -a order=()
+  declare -A seen=()
 
-  scans_left="true"
   log::info "Scanning script ${target}"
   for inc in $(::get_includes "${target}"); do
-    log::info "Adding $inc"
-    checked[$inc]="false"
+    if [ -z "${seen[$inc]:-}" ]; then
+      log::info "Adding $inc"
+      seen[$inc]="1"
+      order+=("$inc")
+    fi
   done
-  while [ "$scans_left" = "true" ]; do
-    scans_left="false"
-    for inc in "${!checked[@]}"; do
-      if [ "${checked[$inc]}" = "false" ]; then
-        for subinc in $(::get_includes "$(includer::find $inc)"); do
-          if [ -z "${checked[$subinc]}" ]; then
-            log::info "Adding $subinc"
-            checked[$subinc]="false"
-            scans_left="true"
-          fi
-        done
-        checked[$inc]="true"
+  local i=0
+  while [ "$i" -lt "${#order[@]}" ]; do
+    local current="${order[$i]}"
+    for subinc in $(::get_includes "$(includer::find "$current")"); do
+      if [ -z "${seen[$subinc]:-}" ]; then
+        log::info "Adding $subinc"
+        seen[$subinc]="1"
+        order+=("$subinc")
       fi
     done
+    i=$((i + 1))
   done
-  for inc in "${!checked[@]}"; do
-    echo $inc
+  for inc in "${order[@]}"; do
+    echo "$inc"
   done
 }
 
@@ -83,7 +83,7 @@ for inc in $(get_all_includes "${TargetFile:?}"); do
 done
 
 grep -v "^@include" "${TargetFile}" |
-  sed -e 's/BASH_SOURCE[\d]/BASH_SOURCE[0]/g' |
+  sed -E -e 's/BASH_SOURCE\[-?[0-9]+\]/BASH_SOURCE[0]/g' |
   grep -v "includer.sh" |
   grep -v "^#!" >>"${OutputFile:?}"
 

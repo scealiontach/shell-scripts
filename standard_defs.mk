@@ -105,7 +105,7 @@ TOOL_ENVIRONMENT = -e GITHUB_TOKEN -e MAVEN_HOME=/home/toolchain/.m2 \
 TOOL_NOWORKDIR = $(DOCKER_RUN_USER) $(TOOL_ENVIRONMENT) $(TOOL_VOLS)
 TOOL_DEFAULT_NOWORKDIR = $(DOCKER_RUN_DEFAULT) $(TOOL_ENVIRONMENT) $(TOOL_VOLS)
 TOOL = $(TOOL_NOWORKDIR) -w $${WORKDIR:-/project}
-TOOL_DEFAULT = $(TOOL_DEFAULT_NOWRKDIR) -w $${WORKDIR:-/project}
+TOOL_DEFAULT = $(TOOL_DEFAULT_NOWORKDIR) -w $${WORKDIR:-/project}
 
 TOOLCHAIN := $(TOOL) $(TOOLCHAIN_IMAGE)
 DOCKER_MVN := $(TOOLCHAIN) mvn -Drevision=$(MAVEN_REVISION) -B
@@ -319,7 +319,7 @@ build/$(REPO)-$(VERSION).zip:
 
 build/$(REPO)-$(VERSION).tgz:
 	if [ -d .git ]; then \
-	  git archive HEAD --format=zip -9 --output=build/$(REPO)-$(VERSION).tgz; \
+	  git archive HEAD --format=tar.gz -9 --output=build/$(REPO)-$(VERSION).tgz; \
 	fi
 
 $(MARKERS)/toolchain_vols:
