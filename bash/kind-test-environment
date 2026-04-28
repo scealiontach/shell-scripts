@@ -53,7 +53,7 @@ options::add -o c -d "command: create, delete" -a -m -e COMMAND
 options::add -o t -d "namespaces to add" -a -f ::add_ns
 options::add -o d -d "address of a remote docker daemon" -a -e DOCKER_HOST
 options::add -o D -d "Use DinD(Docker in Docker)" -x USE_DIND
-options::add -o P -d "Use the specified port fo::add_ingress_providerr the DinD daemon" -a -e DIND_PORT
+options::add -o P -d "Use the specified port for the DinD daemon" -a -e DIND_PORT
 options::parse "$@"
 
 CLUSTER_NAME=${CLUSTER_NAME:-test}
@@ -71,20 +71,34 @@ function ::is_dind_running {
   [ "$is_running" = "true" ]
 }
 
+function ::wait_for_dind {
+  # Poll the daemon up to DIND_READY_TIMEOUT seconds (default 60).
+  local timeout=${DIND_READY_TIMEOUT:-60}
+  local waited=0
+  while [ "$waited" -lt "$timeout" ]; do
+    if docker -H "tcp://localhost:$DOCKER_PORT" info >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  log::error "Timed out after ${timeout}s waiting for DinD on tcp://localhost:$DOCKER_PORT"
+  return 1
+}
+
 function ::use_dind {
   local name="$CLUSTER_NAME-dind"
   if [ "$USE_DIND" = "true" ]; then
     if ::is_dind_running "$name"; then
       log::info "Using pre-existing DinD container $name"
-      export DOCKER_HOST=tcp://localhost:2375
+      export DOCKER_HOST=tcp://localhost:$DOCKER_PORT
     else
-      log::info "Starting DinD container $name"
-      export DOCKER_PORT=2375
-      docker run -d --name "$name" --privileged -p $DOCKER_PORT:2375 -p 6443:6443 -p 8080:80 -p 8443:443 \
+      log::info "Starting DinD container $name on port $DOCKER_PORT"
+      docker run -d --name "$name" --privileged -p "$DOCKER_PORT:2375" -p 6443:6443 -p 8080:80 -p 8443:443 \
         -e DOCKER_TLS_CERTDIR="" \
         docker:dind --tls=false >/dev/null
       export DOCKER_HOST=tcp://localhost:$DOCKER_PORT
-      sleep 30
+      ::wait_for_dind || exit 1
     fi
   fi
 }
