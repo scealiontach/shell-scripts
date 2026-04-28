@@ -43,6 +43,9 @@ repos:
           - -P
           - SCRIPTDIR
       - id: script-must-have-extension
+        # bats specs use the .bats extension, and helpers.bash is a
+        # bats-loaded helper file — neither should be renamed to .sh.
+        exclude: "^tests/.*\\.(bats|bash)$"
       - id: script-must-not-have-extension
       - id: shfmt
         args:
@@ -58,9 +61,20 @@ repos:
     rev: v1.5.6
     hooks:
       - id: forbid-tabs
-        exclude: "^(Makefile|.*.mk|.*.go)$"
+        exclude: "^(Makefile|.*.mk|.*.go|\\.gitmodules)$"
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.38.0
     hooks:
       - id: yamllint
         exclude: ".*/templates/.*"
+  - repo: local
+    hooks:
+      - id: bats
+        name: bats
+        entry: tests/bats/bin/bats
+        language: system
+        pass_filenames: false
+        always_run: true
+        args:
+          - "--tap"
+          - "tests"

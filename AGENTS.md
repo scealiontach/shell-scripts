@@ -17,6 +17,9 @@ make clean               # remove dist/
 make package             # explicit package target
 make publish             # tag-driven gh release upload (only when RELEASABLE=yes)
 make what_version        # print VERSION / LONG_VERSION / MAVEN_REVISION
+make test                # run bats library specs + tests/sur-*.sh sprint tests
+make test_bats           # only the bats specs
+tests/bats/bin/bats tests/<name>.bats     # run a single bats spec
 
 pre-commit run --all-files                # full lint suite
 pre-commit run shellcheck --all-files     # only shellcheck
@@ -26,10 +29,36 @@ bash/bashadoc bash/<lib>.sh               # generate markdown docs for one libra
 bash/pack-script -f <command> -o <out>    # inline @include deps -> standalone
 ```
 
-There is no test suite — this repo is shell scripts and libraries, not a tested codebase.
 CI (`.github/workflows/pre-commit.yaml`) only runs pre-commit hooks; Jenkins runs
 `make clean build`, `make package`, `make analyze`, `make test`, `make archive`,
 and on `main` `make publish`.
+
+## Testing
+
+Two complementary test layers live under `tests/`:
+
+- `tests/*.bats` — library-level [bats-core](https://github.com/bats-core/bats-core)
+  specs covering `commands`, `dirs`, `options`, `log`, `git`, `includer`,
+  `semver`, and `update-repo-tags`. The runner is vendored as a git
+  submodule pinned at `tests/bats`, so a fresh checkout needs
+  `git submodule update --init` once.
+- `tests/sur-*.sh` — per-sprint regression scripts driven by `tests/run.sh`
+  and the helpers under `tests/lib/`. Add a new file when a sprint ships a
+  regression that bats coverage doesn't naturally express (e.g. end-to-end
+  pack-script roundtrips).
+
+`make test` runs both layers. `pre-commit run --all-files` also invokes the
+bats suite via the `bats` local hook.
+
+To add a new bats spec:
+
+- Create `tests/<thing>.bats` starting with `#!/usr/bin/env bats` and
+  `setup() { load 'helpers.bash'; helpers::isolate_home; }`.
+- Use `helpers::source_lib <name>` if you need to source a library
+  directly, or shell out via
+  `bash -c "source bash/includer.sh; @include <lib>; …"` for isolation.
+- Run it locally with `tests/bats/bin/bats tests/<thing>.bats` before
+  committing.
 
 ## Architecture
 
@@ -98,6 +127,16 @@ shift "$((OPTIND - 1))"
 `-e VAR` exports the value into a global; `-x VAR` marks a flag; `-f fn` calls
 `fn` with the optarg. `-h` is added automatically. `options::parse` exits with
 help if no args are provided unless `NO_SYNTAX_EXIT` is set.
+
+Two additional public entry points exist for less common cases:
+
+- `options::clear` resets the OPTIONS state (and re-adds `-h`). Useful when a
+  script re-uses the framework across multiple option sets, or in tests that
+  need a clean slate per case.
+- `options::parse_available` is the body of `options::parse` without the
+  no-args syntax-exit guard. Use it directly when the script accepts only
+  positional arguments after the flags and you want to drop the implicit
+  "exit on bare invocation" behaviour without setting `NO_SYNTAX_EXIT`.
 
 ## Conventions
 

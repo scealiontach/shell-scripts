@@ -71,6 +71,18 @@ function k8s::get_pod_names() {
   k8s::get pods -o name "$@"
 }
 
+function k8s::pod_names_for_label() {
+  @doc List short pod names matching a label, restricted to Running phase
+  @arg _1_ the label selector passed verbatim to kubectl as -l
+  @arg _2_ optional namespace, empty for the active context
+  local label=${1:?label selector required}
+  local ns=${2:-}
+  local args=(pods -l "$label" --field-selector=status.phase=Running -o name)
+  [ -n "$ns" ] && args+=(-n "$ns")
+  # shellcheck disable=SC2016 # $2 is awk's positional, not a shell expansion
+  k8s::get "${args[@]}" | $(commands::use awk) -F/ '{print $2}'
+}
+
 function k8s::get_ns() {
   @doc get the list of pod names
   for ns in $(k8s::get ns -o name "$@"); do

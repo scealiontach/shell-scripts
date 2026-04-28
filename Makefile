@@ -6,9 +6,12 @@ all: package
 clean:
 	rm -rf dist
 
-.PHONY: test
-test:
+.PHONY: test test_bats
+test: test_bats
 	bash tests/run.sh
+
+test_bats:
+	tests/bats/bin/bats tests/*.bats
 
 package: package_scripts
 

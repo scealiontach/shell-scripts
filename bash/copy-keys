@@ -27,11 +27,11 @@ options::standard
 options::set_description "Copies the keys from the validators to a directory \
   on the local host."
 options::add -o l -d "label to select the validators" -a -m -e LABEL
+options::add -o n -d "namespace to query (default: current context)" -a -e NAMESPACE
 options::parse "$@"
 
 log::info "Copying keys from pods with label $LABEL"
-for pod in $(k8s::ctl get pods -l "$LABEL" | grep -v NAME | awk '{print $1}' |
-  sort); do
+for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
   node_name=$(k8s::ctl get pod "$pod" -o json | $(commands::use jq) -r '.spec.nodeName')
   log::info "Working on $node_name with pod $pod"
   mkdir -p "keys/$node_name"

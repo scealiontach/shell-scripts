@@ -19,14 +19,24 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 @include commands
 @include k8s
+@include options
 
-LABEL=$1
+options::standard
+options::set_description "Run a kubectl subcommand against every Running pod \
+  matching a label."
+options::add -o n -d "namespace to query (default: current context)" -a -e NAMESPACE
+# LABEL and COMMAND are positional after the options, so suppress the
+# "no args" syntax exit and let the script error on bare positional use
+# below if needed.
+NO_SYNTAX_EXIT=true options::parse "$@"
+shift $((OPTIND - 1))
+
+LABEL=${1:?label required as first positional arg}
 shift
-COMMAND=$1
+COMMAND=${1:?subcommand required as second positional arg}
 shift
 clear
-for pod in $(k8s::ctl get pods -l "$LABEL" | grep -v Terminat |
-  grep -v NAME | awk '{print $1}' | sort); do
+for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
   node_name=$(k8s::ctl get pod "$pod" -o json |
     $(commands::use jq) -r '.spec.nodeName')
   echo "=== $node_name $pod ==="

@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Recording stub for kubectl used by the bats suite.
+#
+# Contract:
+#   * Writes the full argv to $KUBECTL_ARGV_LOG (one invocation per line,
+#     space-separated). Tests assert against this file.
+#   * If the argv contains the substring "-o name" anywhere, prints a
+#     fixed two-line listing (pod/example-pod-1, pod/example-pod-2)
+#     regardless of the label selector, namespace, or any other flags.
+#   * For all other invocations, prints nothing and exits 0.
+#
+# A new caller that needs different fixture data should either teach
+# this stub a new case clause or use its own per-test stub.
+echo "$@" >>"${KUBECTL_ARGV_LOG:-/dev/null}"
+case "$*" in
+  *"-o name"*)
+    echo "pod/example-pod-1"
+    echo "pod/example-pod-2"
+    ;;
+esac
