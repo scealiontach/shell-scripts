@@ -25,22 +25,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 options::standard
 options::description "Fetch the logs for the containers into local files"
 options::add -o l -d "label of pod selector" -a -m -e selector
-options::add -o c -d "container whose logs to dump" -a -m -e container
+options::add -o c -d "container whose logs to dump (defaults to all)" -a -e container
 options::parse "$@"
 shift $((OPTIND - 1))
 
 # shellcheck disable=SC2154 # selector/container exported by options::add -e
 get_pods_cmd=(k8s::ctl get pods -l "$selector" -o json)
-log::info "Fetching logs of pods for selector $selector container: ${container:?}"
+log::info "Fetching logs of pods for selector $selector container: ${container:-all}"
 for pod in $("${get_pods_cmd[@]}" |
   $(commands::use jq) -r '.items[].metadata.name'); do
   log_cmd=(k8s::ctl logs "$pod" "--tail=10000" --timestamps)
+  suffix=${container:-all}
   if [ -n "$container" ]; then
-    log::info "Fetching $container logs of pod $pod to $pod.$container.out"
+    log::info "Fetching $container logs of pod $pod to $pod.$suffix.out"
     log_cmd+=(-c "$container")
   else
-    log::info "Fetching all logs of pod $pod to $pod.$container.out"
+    log::info "Fetching all logs of pod $pod to $pod.$suffix.out"
     log_cmd+=(--all-containers "--max-log-requests=100")
   fi
-  "${log_cmd[@]}" | sed 's/\x1b\[[0-9;]*m//g' >"$pod.$container.out"
+  "${log_cmd[@]}" | sed 's/\x1b\[[0-9;]*m//g' >"$pod.$suffix.out"
 done
