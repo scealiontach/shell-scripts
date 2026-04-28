@@ -24,7 +24,7 @@ repos:
       - id: no-commit-to-branch
         args:
           - --pattern
-          - '^(?!((fix|feature|refactor)\/[a-zA-Z0-9\-]+)$).*'
+          - '^(?!((fix|feature|refactor|sprint)\/[a-zA-Z0-9\-]+)$).*'
       - id: trailing-whitespace
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v4.13.10

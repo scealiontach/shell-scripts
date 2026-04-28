@@ -102,14 +102,14 @@ help if no args are provided unless `NO_SYNTAX_EXIT` is set.
 ## Conventions
 
 - **Branch names**: pre-commit's `no-commit-to-branch` hook rejects *commits*
-  on any branch not matching `^(fix|feature|refactor)/[a-zA-Z0-9\-]+$`. The
-  hook runs only at commit time (the `pre-commit` stage) and is skipped in
+  on any branch not matching `^(fix|feature|refactor|sprint)/[a-zA-Z0-9\-]+$`.
+  The hook runs only at commit time (the `pre-commit` stage) and is skipped in
   CI via `SKIP: no-commit-to-branch`. The regex restricts the suffix to
   `[a-zA-Z0-9-]` — underscores, dots, and nested slashes after the prefix
   slash are rejected. The check can be bypassed with `git commit --no-verify`
   (or `SKIP=no-commit-to-branch git commit`); for a hard guarantee, complement
   it with a server-side branch-protection rule. Use `feature/...`, `fix/...`,
-  or `refactor/...`.
+  `refactor/...`, or `sprint/...`.
 - **Commit messages**: commitizen runs at `commit-msg` stage, so conventional
   commits (`feat:`, `fix:`, `docs:`, `ci:`, etc.) are enforced.
 - **Formatting**: shfmt with `-i 2 -ci` (2-space indent, indent switch cases).

@@ -79,7 +79,7 @@ make what_version        # print VERSION / LONG_VERSION / MAVEN_REVISION
 
 ## Contributing
 
-* Branch names must match `^(fix|feature|refactor)/[a-zA-Z0-9\-]+$` — the
+* Branch names must match `^(fix|feature|refactor|sprint)/[a-zA-Z0-9\-]+$` — the
   `no-commit-to-branch` pre-commit hook rejects commits on any other name.
 * Commit messages follow Conventional Commits (`feat:`, `fix:`, `docs:`,
   `ci:`, …). `commitizen` enforces this at the `commit-msg` stage.
