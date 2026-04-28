@@ -109,13 +109,19 @@ function create_package {
   if [ "${ALL_NAMESPACES}" = "true" ]; then
     file="$cluster.ALL-${now}.tar.gz"
   fi
-  file=${file/\//_}
+  file=${file//\//_}
+  local file_abs="$PWD/$file"
   log::notice "Creating package $file"
-  find "${OUT_DIR}" -type f -print0 | sed -e "s@$OUT_DIR/@@g" |
-    xargs -0 tar cfz "$file" -C "${OUT_DIR}"
+  # Pipe `find -print0` straight to tar with a relative -C base so paths
+  # inside the archive don't include the $OUT_DIR prefix. The previous
+  # implementation interposed `sed` between `find -print0` and `xargs -0`,
+  # which is line-oriented and mangled the NUL delimiters - xargs then
+  # received one giant blob and tar silently missed files.
+  (cd "${OUT_DIR}" && find . -type f -print0 |
+    tar --null --files-from=- -czf "$file_abs")
   if [ -n "$(command -v shred)" ]; then
     log::notice "Shredding temporary files in ${OUT_DIR}"
-    find "${OUT_DIR}" -type f -exec shred {} \;
+    find "${OUT_DIR}" -type f -exec shred {} +
   fi
   log::notice "Removing ${OUT_DIR}"
   rm -rf "${OUT_DIR}"
