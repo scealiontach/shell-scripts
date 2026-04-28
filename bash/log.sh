@@ -193,19 +193,27 @@ FORMAT_LOG() {
   formatted_log="${formatted_log/'%LEVEL'/$level}"
   formatted_log="${formatted_log/'%PID'/$pid}"
   formatted_log="${formatted_log/'%DATE'/$date}"
-  # shellcheck disable=SC2028
-  echo "$formatted_log\n"
+  printf '%s\n' "$formatted_log"
 }
 
 # Calls one of the individual log functions
 # Usage: LOG <log level> <log message>
 # Eg: LOG INFO "My info log"
 LOG() {
-  local level="$1"
-  level=$(echo "$level" | awk '{ print toupper($0)}')
+  local level="${1^^}"
   local log="$2"
-  local log_function_name="${!level}"
-  $log_function_name "$log"
+  case "$level" in
+    TRACE) log::trace "$log" ;;
+    DEBUG) log::debug "$log" ;;
+    INFO) log::info "$log" ;;
+    WARN | WARNING) log::warn "$log" ;;
+    NOTICE) log::notice "$log" ;;
+    ERROR) log::error "$log" ;;
+    CRITICAL) log::critical "$log" ;;
+    ALERT) log::alert "$log" ;;
+    EMERGENCY) log::emergency "$log" ;;
+    *) log::error "Unknown log level: $1" ;;
+  esac
 }
 
 log() {
@@ -253,6 +261,5 @@ LOG_HANDLER_LOGFILE() {
   local log_path
   log_path="$(dirname "$LOGFILE")"
   [ -d "$log_path" ] || mkdir -p "$log_path"
-  local out_log="${log//\\n/}"
-  echo "$out_log" >>"$LOGFILE"
+  echo "$log" >>"$LOGFILE"
 }
