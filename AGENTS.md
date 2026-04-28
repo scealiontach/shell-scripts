@@ -128,6 +128,16 @@ shift "$((OPTIND - 1))"
 `fn` with the optarg. `-h` is added automatically. `options::parse` exits with
 help if no args are provided unless `NO_SYNTAX_EXIT` is set.
 
+Two additional public entry points exist for less common cases:
+
+- `options::clear` resets the OPTIONS state (and re-adds `-h`). Useful when a
+  script re-uses the framework across multiple option sets, or in tests that
+  need a clean slate per case.
+- `options::parse_available` is the body of `options::parse` without the
+  no-args syntax-exit guard. Use it directly when the script accepts only
+  positional arguments after the flags and you want to drop the implicit
+  "exit on bare invocation" behaviour without setting `NO_SYNTAX_EXIT`.
+
 ## Conventions
 
 - **Branch names**: pre-commit's `no-commit-to-branch` hook rejects *commits*
