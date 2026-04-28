@@ -26,6 +26,35 @@ function _curl() {
   $(commands::use curl) "$@"
 }
 
+function _jq() {
+  $(commands::use jq) "$@"
+}
+
+function incident_data() {
+  local service_id="${1:?}"
+  local alert_type="${2:?}"
+  local alert_title="${3:?}"
+  local incident_key="${4}"
+
+  # shellcheck disable=SC2016 # jq filter syntax: $-prefixed names are jq
+  # variables bound by --arg above, not bash variables.
+  _jq -n \
+    --arg type "$alert_type" \
+    --arg title "$alert_title" \
+    --arg sid "$service_id" \
+    --arg key "$incident_key" \
+    '{
+      incident: (
+        {
+          type: $type,
+          title: $title,
+          service: { id: $sid, type: "service_reference" }
+        }
+        + (if $key != "" then { incident_key: $key } else {} end)
+      )
+    }'
+}
+
 function send_incident() {
   local service_id="${1:?}"
   local alert_type="${2:?}"
@@ -34,25 +63,12 @@ function send_incident() {
   local alert_token="${5:?}"
   local incident_key="${6}"
 
-  if [ -z "$incident_key" ]; then
-    incident_data() {
-      cat <<EOF
-        { "incident": { "type": "$alert_type", "title": "$alert_title", "service": { "id": "$service_id", "type": "service_reference" } } }
-EOF
-    }
-  else
-    incident_data() {
-      cat <<EOF
-        { "incident": { "type": "$alert_type", "title": "$alert_title", "service": { "id": "$service_id", "type": "service_reference" }, "incident_key": "$incident_key" } }
-EOF
-    }
-  fi
-
   _curl POST --header 'Content-Type: application/json' \
     --header 'Accept: application/vnd.pagerduty+json;version=2' \
     --header "From: $alert_from" \
     --header "Authorization: Token token=$alert_token" \
-    --data "$(incident_data)" 'https://api.pagerduty.com/incidents'
+    --data "$(incident_data "$service_id" "$alert_type" "$alert_title" "$incident_key")" \
+    'https://api.pagerduty.com/incidents'
   log::info "Sent PagerDuty incident"
 }
 
