@@ -37,12 +37,13 @@ HOSTNAME=$(echo "$FQDN" | awk -F. '{print $1}')
 DOMAIN=${FQDN/#${HOSTNAME}./}
 
 CERT_GROUP="local"
-if [ -z "$DOMAIN" ]; then
+if [ -n "$DOMAIN" ]; then
   # shellcheck disable=2034
   CERT_GROUP="$DOMAIN"
 fi
 
 TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT INT TERM
 
 cd "${TMPDIR}" || error::exit "Cannot cd to $TMPDIR"
 
@@ -55,7 +56,7 @@ function ::sudo {
 }
 
 log::info "Fetching certificates for $FQDN:$PORT"
-openssl::cmd s_client -showcerts -verify 5 \
+::openssl s_client -showcerts -verify 5 \
   -connect "$FQDN:$PORT" </dev/null 2>/dev/null |
   awk '/BEGIN/,/END/{ if(/BEGIN/){a++}; out="cert"a".crt"; print >out}'
 
@@ -85,10 +86,10 @@ function add-certs-ubuntu() {
     if [ "$cert" = "${_FQDN}.pem" ]; then
       continue
     fi
-    INFO "Copying $cert to /etc/ssl/certs"
+    log::info "Copying $cert to /etc/ssl/certs"
     ::sudo cp "$cert" /etc/ssl/certs
   done
-  INFO "Updating CA-Trust"
+  log::info "Updating CA-Trust"
   ::sudo update-ca-certificates
 }
 
