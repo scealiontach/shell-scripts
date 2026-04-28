@@ -12,31 +12,28 @@ alias klu='kubectl config get-users| grep -v NAME'
 #shellcheck disable=SC2142
 alias kln='k get ns -o name |awk -F/ "{print \$2}"'
 alias kg='k get'
-alias kl='k logs'
 alias ke='k exec'
 
 function ks {
   local pod=$1
-  command=(kubectl exec -it "$pod")
+  local -a cmd=(kubectl exec -it "$pod")
   if [ -n "$2" ]; then
-    local container=$1
-    shift
-    command+=(-c "$container")
+    local container=$2
+    cmd+=(-c "$container")
   fi
-  command+=(-- bash)
-  "${command[@]}"
+  cmd+=(-- bash)
+  "${cmd[@]}"
 }
 
 function kss {
   local pod=$1
-  command=(kubectl exec -it "$pod")
+  local -a cmd=(kubectl exec -it "$pod")
   if [ -n "$2" ]; then
-    local container=$1
-    shift
-    command+=(-c "$container")
+    local container=$2
+    cmd+=(-c "$container")
   fi
-  command+=(-- sh)
-  "${command[@]}"
+  cmd+=(-- sh)
+  "${cmd[@]}"
 }
 
 function update_eksctl {
