@@ -193,4 +193,11 @@ provisioner: kubernetes.io/no-provisioner
 volumeBindingMode: WaitForFirstConsumer
 EOF
 }
-$COMMAND
+case "$COMMAND" in
+  create | stop | delete | help) "$COMMAND" ;;
+  *)
+    echo "Unknown command: '$COMMAND' (allowed: create, stop, delete, help)" >&2
+    help >&2
+    exit 1
+    ;;
+esac

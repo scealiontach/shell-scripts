@@ -238,4 +238,10 @@ function delete {
   # set +e
 }
 
-"$COMMAND"
+case "$COMMAND" in
+  create | delete) "$COMMAND" ;;
+  *)
+    log::error "Unknown command: '$COMMAND' (allowed: create, delete)"
+    exit 1
+    ;;
+esac
