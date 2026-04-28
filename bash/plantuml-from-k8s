@@ -17,7 +17,21 @@
 # shellcheck source=includer.sh
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
+@include error
 @include k8s
+@include options
+
+options::standard
+options::description "Generate a PlantUML diagram of a Kubernetes cluster's topology."
+options::add -o c -d "cluster name (also accepted as positional arg)" -a -e CLUSTER
+NO_SYNTAX_EXIT=true options::parse_available "$@"
+shift $((OPTIND - 1))
+
+# shellcheck disable=SC2154 # CLUSTER exported by options::add -e
+CLUSTER=${CLUSTER:-${1:-}}
+if [ -z "$CLUSTER" ]; then
+  error::exit "cluster name is required (use -c CLUSTER or pass positionally)"
+fi
 
 function start() {
   local cluster=${1:?}
@@ -55,7 +69,7 @@ function getItems() {
   local ns=$1
   local itemType=$2
   if [ "$itemType" = "rs" ]; then
-    getRs "$@"
+    getRs "$ns" "${3:-}"
   else
     if [ -n "$3" ]; then
       selector=(-l "$3")
@@ -68,9 +82,8 @@ function getItems() {
 
 function getRs() {
   local ns=$1
-  local itemType=$2
-  if [ -n "$3" ]; then
-    selector=(-l "$3")
+  if [ -n "$2" ]; then
+    selector=(-l "$2")
   else
     selector=()
   fi
@@ -139,7 +152,7 @@ EOF
   for entry in $(getItems "$ns" pod); do
     item Pod "$ns" "$entry"
   done
-  for entry in $(getRs "$ns" replicaset); do
+  for entry in $(getRs "$ns"); do
     item Rs "$ns" "$entry"
   done
   for entry in $(getItems "$ns" job); do
@@ -197,4 +210,4 @@ EOF
   echo @enduml
 }
 
-cluster "$1"
+cluster "$CLUSTER"

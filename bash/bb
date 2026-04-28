@@ -26,7 +26,12 @@ options::add -o c -d "Config file for BB rest api" -a -m -e CONFIG
 options::parse "$@"
 
 shift $((OPTIND - 1))
-if [ -n "$CONFIG" ] && [ -r "$HOME/.${CONFIG}-config" ]; then
+# shellcheck disable=SC2154 # CONFIG exported by options::add -e
+if [ -z "$CONFIG" ] || [[ ! "$CONFIG" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  error::exit "Invalid -c config name: '$CONFIG' (allowed: [a-zA-Z0-9_-]+)"
+fi
+if [ -r "$HOME/.${CONFIG}-config" ]; then
+  # shellcheck source=/dev/null
   source "$HOME/.${CONFIG}-config"
 else
   error::exit "Specified config($CONFIG) was not found"
@@ -45,21 +50,25 @@ function bb_api_call() {
 }
 
 function pr-data() {
-  local repo="$1"
-  local project repo
-  project=$(echo "$repo" | awk -F/ '{print $1}')
-  repo=$(echo "$repo" | awk -F/ '{print $2}')
-  bb_api_call GET "projects/$project/repos/$repo/pull-requests?state=open&limit=100"
+  local slug="$1"
+  local project repo_name
+  project=$(echo "$slug" | awk -F/ '{print $1}')
+  repo_name=$(echo "$slug" | awk -F/ '{print $2}')
+  bb_api_call GET "projects/$project/repos/$repo_name/pull-requests?state=open&limit=100"
 }
 
 function pr-count() {
-  local repo=$1
-  pr-data "$repo" | jq -r '.size'
+  local slug=$1
+  pr-data "$slug" | jq -r '.size'
 }
 
 function pr-list() {
-  local repo=$1
-  pr-data "$repo" | jq -r '.values[].links.self[].href'
+  local slug=$1
+  pr-data "$slug" | jq -r '.values[].links.self[].href'
 }
 
-"$@"
+case "${1:-}" in
+  pr-data | pr-count | pr-list) "$@" ;;
+  '') error::exit "Subcommand required (one of: pr-data, pr-count, pr-list)" ;;
+  *) error::exit "Unknown subcommand: $1" ;;
+esac

@@ -39,10 +39,14 @@ ALERT_FROM=${ALERT_FROM:="no-reply@blockchaintp.com"}
 
 case $ALERT_TYPE in
   incident)
-    exec::hide send_incident "$SERVICE_ID" "$ALERT_TYPE" "$ALERT_TITLE" "$ALERT_FROM" "$ALERT_TOKEN" "$INCIDENT_KEY" ||
+    exec::hide pagerduty::send_incident "$SERVICE_ID" "$ALERT_TYPE" "$ALERT_TITLE" "$ALERT_FROM" "$ALERT_TOKEN" "$INCIDENT_KEY" ||
       error::exit "Failed to send $ALERT_TYPE"
     ;;
   event)
-    #exec::hide send_event "$ALERT_TOKEN" "$SERVICE_ID" "$ALERT_TITLE" || error::exit "Failed to send $ALERT_TYPE"
+    pagerduty::send_event "$ALERT_TOKEN" "$SERVICE_ID" "$ALERT_TITLE" ||
+      error::exit "Failed to send $ALERT_TYPE"
+    ;;
+  *)
+    error::exit "Unknown -i alert type: '$ALERT_TYPE' (expected 'incident' or 'event')"
     ;;
 esac

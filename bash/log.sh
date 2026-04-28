@@ -44,6 +44,21 @@ export LOG_COLOR_EMERGENCY="\033[41m" # Red Background
 export RESET_COLOR="\033[0m"
 
 #-----------------------------------------------------------------------------
+# LOG_LEVEL -> enabled-levels mapping (cumulative)
+#
+#   LOG_LEVEL=0  ERROR/CRITICAL/ALERT/EMERGENCY/NOTICE only (default)
+#   LOG_LEVEL=1  + WARNING
+#   LOG_LEVEL=2  + INFO
+#   LOG_LEVEL=3  + DEBUG
+#   LOG_LEVEL=4  + TRACE
+#
+# log::level "$N" sets LOG_LEVEL=N and recomputes the LOG_DISABLE_*
+# flags. Below the file calls log::level "$LOG_LEVEL" once at source
+# time so the disable flags are deterministic — without that call, the
+# flags are unset and tests like `[ "$LOG_DISABLE_INFO" = "false" ]`
+# evaluate false (empty != "false"), silently disabling output.
+# options::standard's -v flag drives this via log::level_increase.
+#-----------------------------------------------------------------------------
 # Individual Log Functions
 # These can be overwritten to provide custom behavior for different log levels
 LOG_LEVEL=${LOG_LEVEL:-0}
@@ -71,6 +86,15 @@ function log::level() {
   fi
   LOG_LEVEL=$level
 }
+
+# Initialise the LOG_DISABLE_* flags from LOG_LEVEL at source time so
+# scripts that don't pass -v still get deterministic gating. Skip if a
+# caller has already pre-set any of the disable flags directly (so
+# explicit pre-set values survive sourcing).
+if [ -z "${LOG_DISABLE_INFO+set}" ] && [ -z "${LOG_DISABLE_DEBUG+set}" ] &&
+  [ -z "${LOG_DISABLE_WARNING+set}" ] && [ -z "${LOG_DISABLE_TRACE+set}" ]; then
+  log::level "$LOG_LEVEL"
+fi
 
 function log::level_increase() {
   @doc Increase the LOG_LEVEL

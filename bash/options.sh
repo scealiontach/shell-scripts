@@ -225,6 +225,10 @@ function options::getopts() {
 }
 
 function options::standard() {
+  @doc Add the standard option set. The -v flag drives log::level_increase \
+    which raises LOG_LEVEL by 1 each time it is given. See bash/log.sh \
+    for the LOG_LEVEL to enabled-levels mapping from 0 to 4. The default \
+    level 0 emits only ERROR, CRITICAL, ALERT, EMERGENCY, and NOTICE.
   options::add -o v -d "set verbosity level" -f log::level_increase
 }
 
