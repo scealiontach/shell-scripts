@@ -24,10 +24,10 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 options::standard
 options::set_description "Checks either the local system or a list of ssh \
-  targets for their system BIOS version and SGX driver."
+  targets for their system BIOS version and SGX driver. Default mode is \
+  local; pass -s to fan out over the supplied ssh targets instead."
 options::add -o u -d "use sudo" -x USE_SUDO
 options::add -o s -d "use ssh" -x USE_SSH
-options::add -o l -d "run locally" -x RUN_LOCALLY
 options::parse_available "$@"
 shift $((OPTIND - 1))
 
@@ -64,37 +64,52 @@ if [ "$USE_SSH" != "true" ]; then
     log::debug "${driver_cmd[*]}"
     driver=$("${driver_cmd[@]}") || error::exit "Failed to execute driver command"
   else
-    log::warn "No ISGX driver loaded on ${host}"
+    log::warn "No ISGX driver loaded on localhost"
     driver="(none)"
   fi
 
   log::info "host=localhost bios vendor=${vendor} version=${version} release=${release} driver=${driver}"
 else
-  for host in "$@"; do
-    _cmd_prefix=()
-    _cmd_postfix=()
-    _cmd_prefix=("$(commands::use ssh)" "$host")
+  # Build a single shell-quoted remote command string and pass it as one
+  # argument to ssh (or to `sudo -S bash -c`). The remote login shell
+  # re-tokenises it with the original boundaries preserved by printf %q.
+  function remote_cmd_for() {
+    local quoted
+    quoted=$(printf '%q ' "$@")
     if [ "$USE_SUDO" = "true" ]; then
-      _cmd_prefix+=(sudo -S bash -c \")
-      _cmd_postfix=(\")
+      printf 'sudo -S bash -c %q' "$quoted"
+    else
+      printf '%s' "$quoted"
     fi
+  }
 
-    log::debug "${_cmd_prefix[*]} ${vendor_cmd[*]} ${_cmd_postfix[*]}"
-    vendor=$("${_cmd_prefix[@]}" "${vendor_cmd[@]}" "${_cmd_postfix[@]}") ||
+  for host in "$@"; do
+    _ssh=("$(commands::use ssh)" "$host")
+
+    remote=$(remote_cmd_for "${vendor_cmd[@]}")
+    log::debug "${_ssh[*]} $remote"
+    vendor=$("${_ssh[@]}" "$remote") ||
       error::exit "Failed to execute bios-vendor command"
-    log::debug "${_cmd_prefix[*]} ${version_cmd[*]} ${_cmd_postfix[*]}"
-    version=$("${_cmd_prefix[@]}" "${version_cmd[@]}" "${_cmd_postfix[@]}") ||
+
+    remote=$(remote_cmd_for "${version_cmd[@]}")
+    log::debug "${_ssh[*]} $remote"
+    version=$("${_ssh[@]}" "$remote") ||
       error::exit "Failed to execute bios-version command"
-    log::debug "${_cmd_prefix[*]} ${release_cmd[*]} ${_cmd_postfix[*]}"
-    release=$("${_cmd_prefix[@]}" "${release_cmd[@]}" "${_cmd_postfix[@]}") ||
+
+    remote=$(remote_cmd_for "${release_cmd[@]}")
+    log::debug "${_ssh[*]} $remote"
+    release=$("${_ssh[@]}" "$remote") ||
       error::exit "Failed to execute bios-release-date command"
-    log::debug "${_cmd_prefix[*]} ${lsmod_cmd[*]} ${_cmd_postfix[*]}"
-    mod_list=$("${_cmd_prefix[@]}" "${lsmod_cmd[@]}" "${_cmd_postfix[@]}") ||
+
+    remote=$(remote_cmd_for "${lsmod_cmd[@]}")
+    log::debug "${_ssh[*]} $remote"
+    mod_list=$("${_ssh[@]}" "$remote") ||
       error::exit "Failed to execute lsmod command"
 
     if echo "$mod_list" | grep -q isgx; then
-      log::debug "${_cmd_prefix[*]} ${driver_cmd[*]} ${_cmd_postfix[*]}"
-      driver=$("${_cmd_prefix[@]}" "${driver_cmd[@]}" "${_cmd_postfix[@]}") ||
+      remote=$(remote_cmd_for "${driver_cmd[@]}")
+      log::debug "${_ssh[*]} $remote"
+      driver=$("${_ssh[@]}" "$remote") ||
         error::exit "Failed to execute driver command"
     else
       log::warn "No ISGX driver loaded on ${host}"

@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------------
+#
+# Extract literate-markdown blocks from a script. Any line matching the
+# pattern `## @md ...` is emitted with the `## @md ` prefix stripped, so a
+# script can carry markdown prose interleaved with its code and have the
+# prose extracted verbatim. Usage: `mddoc <file>` writes the extracted
+# markdown to stdout. Lines without the marker are ignored.
 
 # shellcheck disable=SC1090
 grep '^\s*## @md' "$1" | sed -e 's/^\s*## @md\s*//'

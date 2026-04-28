@@ -37,11 +37,11 @@ options::parse "$@"
 
 pushd "$TARGET_DIR" >/dev/null || exit 1
 
-DONT_ANNOTATE_TAG=false
+ANNOTATE_TAG=true
 if ! LATEST_TAG=$(git::cmd describe --tags --match 'v*' --abbrev=0 2>/dev/null); then
   log::notice "No prior v* tag found in $TARGET_DIR; defaulting to v0.1.0"
   LATEST_TAG="v0.1.0"
-  DONT_ANNOTATE_TAG=true
+  ANNOTATE_TAG=false
   RANGE="HEAD"
 else
   RANGE="$LATEST_TAG..HEAD"
@@ -49,10 +49,10 @@ fi
 
 if ! LATEST_ANNOTATED_TAG=$(git::cmd describe --match 'v*' --abbrev=0 2>/dev/null); then
   log::notice "No prior tag was annotated"
-  DONT_ANNOTATE_TAG=true
+  ANNOTATE_TAG=false
 else
   if [ "$LATEST_TAG" != "$LATEST_ANNOTATED_TAG" ] || [ -z "$LATEST_ANNOTATED_TAG" ]; then
-    DONT_ANNOTATE_TAG=true
+    ANNOTATE_TAG=false
   fi
 fi
 
@@ -79,7 +79,7 @@ if [ "$BREAKING_CHANGES" -gt 0 ]; then
   fi
 elif [ "$CHANGES" -gt 0 ]; then
   # if we can't annotate tag then we must do a prerel bump
-  if [ "${DONT_ANNOTATE_TAG}" = "true" ]; then
+  if [ "${ANNOTATE_TAG}" = "false" ]; then
     PREREL=$("$(dirs::of)/semver" get prerel "$LATEST_VERSION")
     ((PREREL++))
     TAG=$("$(dirs::of)/semver" bump prerel "$PREREL" "$LATEST_VERSION")
@@ -98,7 +98,7 @@ TAG="v${TAG}"
 
 if [ "$skip" = "false" ]; then
   log::notice "Will tag as $TAG"
-  if [ "$DONT_ANNOTATE_TAG" = "true" ]; then
+  if [ "$ANNOTATE_TAG" = "false" ]; then
     log::notice "No changelog updates for prerel builds"
     git::cmd tag "$TAG"
   else

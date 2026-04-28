@@ -83,7 +83,11 @@ function git::describe() {
   git::cmd describe "$@"
 }
 
-function git::dirty_version() {
-  @doc Get what the dirty version would be for the current repository.
+function git::version_with_dirty_marker() {
+  @doc Get the describe-derived version string with a literal "-dirty" suffix appended unconditionally.
   echo "$(git::describe --tags 2>/dev/null)-dirty"
+}
+
+function git::dirty_version() {
+  deprecated git::version_with_dirty_marker "$@"
 }
