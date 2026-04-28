@@ -47,6 +47,26 @@ if [ "${b_guards:-0}" -lt 1 ]; then
   failures=$((failures + 1))
 fi
 
+# Test B2: verify the *body* of an included file runs exactly once across two
+# @include calls — not just that a guard exists. Override the source builtin
+# to count invocations of bash/log.sh, then double-include and assert count==1.
+b2_count=$(
+  # shellcheck source=/dev/null
+  source "$REPO_ROOT/bash/includer.sh"
+  log_source_count=0
+  # shellcheck disable=SC2329
+  source() {
+    case "$1" in
+      */log.sh) log_source_count=$((log_source_count + 1)) ;;
+    esac
+    builtin source "$@"
+  }
+  @include log
+  @include log
+  echo "$log_source_count"
+)
+assert_eq "1" "$b2_count" "B2: log.sh body should source exactly once across two @includes" || failures=$((failures + 1))
+
 # Test C: stderr capture of missing include contains the diagnostic.
 c_stderr=$(
   # shellcheck source=/dev/null
