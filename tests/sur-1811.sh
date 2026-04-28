@@ -59,6 +59,25 @@ c_clean=$(printf '%s' "$c_stderr" | strip_ansi)
 assert_contains "$c_clean" "lowercase-debug-msg" "C: lowercase 'debug' dispatched" || failures=$((failures + 1))
 assert_contains "$c_clean" "uppercase-error-msg" "C: uppercase 'ERROR' dispatched" || failures=$((failures + 1))
 
+# Test D: consecutive log entries land on separate lines via colorterm handler.
+# Regression guard: command substitution strips the trailing newline from
+# FORMAT_LOG, so LOG_HANDLER_COLORTERM must terminate its own output.
+d_stderr=$(
+  # shellcheck source=/dev/null
+  source "$REPO_ROOT/bash/includer.sh"
+  @include log
+  log::level 2
+  log::log INFO "alpha-line-d" 2>&1
+  log::log WARN "beta-line-d" 2>&1
+  log::log ERROR "gamma-line-d" 2>&1
+)
+d_clean=$(printf '%s' "$d_stderr" | strip_ansi)
+d_lines=$(printf '%s\n' "$d_clean" | grep -c .)
+if [ "$d_lines" -lt 3 ]; then
+  printf 'FAIL: D: expected >=3 lines, got %s. captured=[%s]\n' "$d_lines" "$d_clean" >&2
+  failures=$((failures + 1))
+fi
+
 if [ "$failures" -ne 0 ]; then
   echo "sur-1811: $failures assertion(s) failed" >&2
   exit 1

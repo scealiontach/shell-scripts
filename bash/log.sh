@@ -249,7 +249,7 @@ LOG_HANDLER_COLORTERM() {
   local color_variable="LOG_COLOR_$level"
   local color="${!color_variable}"
   log="$color$log$RESET_COLOR"
-  echo >&2 -en "$log"
+  echo >&2 -e "$log"
 }
 
 # Appends a log to the configured logfile
