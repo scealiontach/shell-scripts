@@ -37,22 +37,34 @@ options::parse "$@"
 
 pushd "$TARGET_DIR" >/dev/null || exit 1
 
-LATEST_TAG=$(git::cmd describe --tags --match 'v*' --abbrev=0) || exit 1
 DONT_ANNOTATE_TAG=false
+if ! LATEST_TAG=$(git::cmd describe --tags --match 'v*' --abbrev=0 2>/dev/null); then
+  log::notice "No prior v* tag found in $TARGET_DIR; defaulting to v0.1.0"
+  LATEST_TAG="v0.1.0"
+  DONT_ANNOTATE_TAG=true
+  RANGE="HEAD"
+else
+  RANGE="$LATEST_TAG..HEAD"
+fi
+
 if ! LATEST_ANNOTATED_TAG=$(git::cmd describe --match 'v*' --abbrev=0 2>/dev/null); then
   log::notice "No prior tag was annotated"
   DONT_ANNOTATE_TAG=true
 else
   if [ "$LATEST_TAG" != "$LATEST_ANNOTATED_TAG" ] || [ -z "$LATEST_ANNOTATED_TAG" ]; then
     DONT_ANNOTATE_TAG=true
-  else
-    DONT_ANNOTATE_TAG=false
   fi
 fi
 
 LATEST_VERSION=$(echo "$LATEST_TAG" | cut -c2-)
-BREAKING_CHANGES=$(git::cmd log "$LATEST_TAG"..HEAD | grep -c "BREAKING CHANGE")
-CHANGES=$(git::cmd log "$LATEST_TAG"..HEAD | grep -c "^commit")
+
+# Conventional Commits flags a breaking change in two distinct ways:
+#   1. A `!` before the colon in the subject form: feat!:, fix(scope)!:, etc.
+#   2. A `BREAKING CHANGE:` or `BREAKING-CHANGE:` footer in the body.
+# Format includes both subject (%s) and body (%b) so both forms are visible.
+BREAKING_CHANGES=$(git::cmd log "$RANGE" --pretty=format:'%s%n%b' |
+  grep -cE '(^[a-zA-Z]+(\([^)]+\))?!:|BREAKING[ -]CHANGE:)')
+CHANGES=$(git::cmd log "$RANGE" --pretty=format:'%H' | grep -c .)
 
 log::notice "Since $LATEST_VERSION $CHANGES changes  $BREAKING_CHANGES breaks"
 
