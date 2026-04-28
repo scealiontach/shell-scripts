@@ -36,7 +36,6 @@
 
 ## v0.1.5
 
-
 ## v0.1.4
 
 * fix(bash): update-repo-tags should add links when it gens changelog [view commit](https://github.com/catenasys/shell-scripts/commit/f6bb36ca7693a2de8701db0af6395f694f0c2fdf)
@@ -98,4 +97,3 @@
 * build: add Makefile and ignore dist [view commit](https://github.com/catenasys/shell-scripts/commit/ac92c3c1456b01f1a9a0ff4155534469cc07c1e5)
 * refactor: updates for documentation [view commit](https://github.com/catenasys/shell-scripts/commit/e8d29f6e38f8a518fd1731e2f4bd4247b4d17398)
 * fix: correct annotation declaration and bashadoc [view commit](https://github.com/catenasys/shell-scripts/commit/612a1011208b7ed8709dd02fbdb2dbc6bd28a348)
-

@@ -29,18 +29,9 @@ jobs:
         uses: trilom/file-changes-action@v1.2.4
         with:
           output: " "
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 16
       - uses: actions/setup-go@v3
         with:
           go-version: '>=1.19.0'
-      - run: |
-          if [ -r package-lock.json ]; then
-            npm ci
-          else
-            exit 0
-          fi
       - run: |
           go install mvdan.cc/sh/v3/cmd/shfmt@latest
       - id: pre-commit
