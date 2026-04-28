@@ -30,12 +30,17 @@ options::add -o r -d "image tag" -a -m -e VERSION
 options::add -o t -d "target repo" -a -m -e ARTIFACTORY
 options::parse "$@"
 
-exec::capture docker::cmd pull "$HOST/$IMAGE:$VERSION" ||
-  error::exit "Failed to pull $HOST/$IMAGE:$VERSION"
+SRC="$HOST/$IMAGE:$VERSION"
+DST="$ARTIFACTORY/$IMAGE:$VERSION"
 
-exec::capture docker::cmd tag "$HOST/$IMAGE:$VERSION" \
-  "$ARTIFACTORY/$IMAGE:$VERSION" ||
-  error::exit "Failed to tag $ARTIFACTORY/$IMAGE:$VERSION"
-
-exec::capture docker::cmd push "$ARTIFACTORY/$IMAGE:$VERSION" ||
-  error::exit "Failed to push $ARTIFACTORY/$IMAGE:$VERSION"
+# docker::cp returns 1/2/3 for pull/tag/push failures respectively. Map
+# each to a specific error::exit so the failing step stays visible in
+# the script's output.
+docker::cp "$SRC" "$DST"
+case $? in
+  0) ;;
+  1) error::exit "Failed to pull $SRC" ;;
+  2) error::exit "Failed to tag $DST" ;;
+  3) error::exit "Failed to push $DST" ;;
+  *) error::exit "docker::cp $SRC -> $DST failed" ;;
+esac
