@@ -13,6 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ------------------------------------------------------------------------------
+#
+# Interactive shortcut: while polling, type `X<Enter>` on stdin to force the
+# watched command to re-run immediately, without waiting for the next poll
+# tick or for an actual filesystem change. Any other input restarts the wait
+# without triggering a run.
 
 # shellcheck source=includer.sh
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
@@ -24,7 +29,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 options::standard
 options::description "A makeshift minimal CI system. It watches a directory for\
  changes and if found it will execute the provided command (after \"--\" ) from the\
-working directory."
+working directory. While running, type X<Enter> on stdin to force an immediate\
+ re-run without waiting for a filesystem change."
 options::add -o W -d "directory to watch for changes" -a -m -e WatchDir
 options::add -o w -d "working directory" -a -m -e WorkingDir
 options::add -o t -d "interval to check for changes" -a -m -e WaitTime
