@@ -2,3 +2,12 @@ dist
 build
 markers
 .vscode
+
+.claude/runs
+
+.claude/sprints/
+
+.claude/sprint-loop-counter
+
+.mcp.json
+.claude-sprint.env
