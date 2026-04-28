@@ -17,7 +17,9 @@
 # shellcheck source=includer.sh
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
+@include annotations
 @include commands
+@include error
 @include log
 
 @package pagerduty
@@ -55,7 +57,8 @@ function incident_data() {
     }'
 }
 
-function send_incident() {
+function pagerduty::send_incident() {
+  @doc Submit an incident via the PagerDuty REST Incidents API
   local service_id="${1:?}"
   local alert_type="${2:?}"
   local alert_title="${3:?}"
@@ -63,21 +66,30 @@ function send_incident() {
   local alert_token="${5:?}"
   local incident_key="${6}"
 
-  _curl POST --header 'Content-Type: application/json' \
+  _curl -X POST --header 'Content-Type: application/json' \
     --header 'Accept: application/vnd.pagerduty+json;version=2' \
     --header "From: $alert_from" \
     --header "Authorization: Token token=$alert_token" \
     --data "$(incident_data "$service_id" "$alert_type" "$alert_title" "$incident_key")" \
-    'https://api.pagerduty.com/incidents'
+    "${PAGERDUTY_INCIDENTS_URL:-https://api.pagerduty.com/incidents}"
   log::info "Sent PagerDuty incident"
 }
 
+function send_incident() {
+  deprecated pagerduty::send_incident "$@"
+}
+
+function pagerduty::send_event() {
+  @doc Submit an event via the PagerDuty Events API v2. Not implemented.
+  # The Events API v2 uses a different endpoint
+  # (events.pagerduty.com/v2/enqueue), a different auth model
+  # (routing_key, not API token), and a different payload schema. Until
+  # someone wires that up, fail loudly so callers don't silently drop
+  # alerts the way the previous body did (it just logged "Sent" and
+  # returned 0 with no HTTP request at all).
+  error::exit "pagerduty::send_event not implemented (use pagerduty::send_incident)"
+}
+
 function send_event() {
-  #set -x
-  #_curl -X POST --header 'Content-Type: application/json' \
-  #--header 'Accept: application/vnd.pagerduty+json;version=2' \
-  #--header "From: $ALERT_FROM" \
-  #--header "Authorization: Token token=$ALERT_TOKEN" \
-  #--data "$(cat $PG_DATA)" 'https://api.pagerduty.com/incidents'
-  log::info "Sent PagerDuty event"
+  deprecated pagerduty::send_event "$@"
 }
