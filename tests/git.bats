@@ -7,6 +7,9 @@ setup() {
   helpers::set_git_identity
   REPO=$(mktemp -d)
   (cd "$REPO" && git init -q .)
+  # Constant rather than three repeated literals so a future repo rename
+  # is a one-line edit and not three silent test failures.
+  EXPECTED="https://github.com/scealiontach/shell-scripts/commit"
 }
 
 teardown() {
@@ -30,17 +33,17 @@ run_projecturl_with_remote() {
 
 @test "git::projecturl strips .git on ssh github URL" {
   out=$(run_projecturl_with_remote "git@github.com:scealiontach/shell-scripts.git")
-  [ "$out" = "https://github.com/scealiontach/shell-scripts/commit" ]
+  [ "$out" = "$EXPECTED" ]
 }
 
 @test "git::projecturl strips .git on https github URL" {
   out=$(run_projecturl_with_remote "https://github.com/scealiontach/shell-scripts.git")
-  [ "$out" = "https://github.com/scealiontach/shell-scripts/commit" ]
+  [ "$out" = "$EXPECTED" ]
 }
 
 @test "git::projecturl handles github URL without .git suffix" {
   out=$(run_projecturl_with_remote "git@github.com:scealiontach/shell-scripts")
-  [ "$out" = "https://github.com/scealiontach/shell-scripts/commit" ]
+  [ "$out" = "$EXPECTED" ]
 }
 
 @test "git::projecturl emits nothing for non-github remotes" {

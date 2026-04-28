@@ -9,13 +9,16 @@ REPO_ROOT="$(cd -P "$TEST_HELPERS_DIR/.." && pwd)"
 export REPO_ROOT
 
 # A deterministic HOME prevents tests from writing into the real user
-# home (log files, gitconfig overrides, etc.). Each test gets its own
-# tempdir under BATS_TEST_TMPDIR if it wants further isolation.
+# home (log files, gitconfig overrides, etc.). Also unset the env vars
+# that would otherwise let a developer machine's per-user XDG/git config
+# leak in past the new HOME — important for local dev runs since CI
+# already starts with a clean environment.
 helpers::isolate_home() {
   local h
   h=$(mktemp -d)
   HOME=$h
   export HOME
+  unset XDG_CONFIG_HOME GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM
 }
 
 # Deterministic git author/committer identity for tests that exercise
