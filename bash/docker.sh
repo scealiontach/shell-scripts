@@ -67,7 +67,9 @@ function docker::push() {
 }
 
 function docker::cp() {
-  @doc copy an image from one image url to another
+  @doc copy an image from one image url to another. \
+    Returns 0 on success, 1 if pull failed, 2 if tag failed, 3 if push failed. \
+    Never calls error::exit, so callers can dispatch on $? without termination.
   @arg _1_ source
   @arg _2_ destination
   local from=${1:?}
