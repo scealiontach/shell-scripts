@@ -70,7 +70,8 @@ function exportRange {
     start_int=$(hex_to_dec "$start")
     stop_int=$(hex_to_dec "$stop")
     echo "Exporting from offset $start to $stop ( $start_int - $stop_int )"
-    rm -rf "$base_dir*"
+    log::info "daml-export: removing prior partial exports under ${base_dir}*"
+    rm -rf -- "$base_dir"*
     rm -rf "$dir"
     mkdir -p "$dir"
     if [ -z "$DAML_TOKEN" ]; then
