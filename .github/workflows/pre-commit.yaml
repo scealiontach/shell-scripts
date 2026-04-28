@@ -24,6 +24,11 @@ jobs:
     # as part of the job
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The bats local pre-commit hook executes tests/bats/bin/bats,
+          # which lives in a git submodule. Without recursive init the
+          # hook fails with "Executable 'tests/bats/bin/bats' not found".
+          submodules: recursive
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
