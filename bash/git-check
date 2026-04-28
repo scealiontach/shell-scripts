@@ -65,8 +65,7 @@ function get_branch_name {
 }
 
 function fetch_if_possible {
-  local base_name
-  base_name=${1:?}
+  local base_name=${1:?}
   log::debug "Fetching $base_name"
   exec::hide git::cmd fetch --all
 }
@@ -132,6 +131,9 @@ log::info "Scanning ${base_path}${EXTRA} for repositories"
 
 max_repo_len=0
 max_branch_len=0
+declare -a UNCOMMITTED=()
+declare -a RELEASABLE=()
+declare -a DEVELOPMENT=()
 for repo in $(find "${base_path}${EXTRA}" -mindepth "${DEPTH}" -maxdepth "${DEPTH}" -name .git -exec dirname {} \; | sort); do
   cd "$repo" || exit 1
   base_name=$(base_name_for_repo "$base_path" "$repo")
@@ -162,53 +164,42 @@ for repo in $(find "${base_path}${EXTRA}" -mindepth "${DEPTH}" -maxdepth "${DEPT
     pr_count='.'
   fi
 
+  # Tab-delimited record: name TAB pr_count TAB branch TAB version. Tabs
+  # are forbidden in any of these fields (repo paths and branch names use
+  # forward-slashes, not tabs), so the encoding is unambiguous.
   if [ -z "$version" ]; then
     version=$(git::cmd rev-parse --short HEAD)
-    UNCOMMITTED="${UNCOMMITTED}$base_name:$pr_count:$branch_name:$version,"
+    UNCOMMITTED+=("$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")")
   elif [ "$version" = "$dirty_version" ]; then
-    UNCOMMITTED="${UNCOMMITTED}$base_name:$pr_count:$branch_name:$version,"
+    UNCOMMITTED+=("$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")")
   elif [ "$version" != "$long_version" ]; then
-    RELEASABLE="${RELEASABLE}$base_name:$pr_count:$branch_name:$version,"
+    RELEASABLE+=("$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")")
   else
-    DEVELOPMENT="${DEVELOPMENT}$base_name:$pr_count:$branch_name:$version,"
+    DEVELOPMENT+=("$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")")
   fi
 done
 
 function output() {
   local color=$1
-  local item=$2
-  for token in ${item//,/ }; do
-    count=0
-    for part in ${token//:/ }; do
-      ((count += 1))
-      if [ "$count" -gt 2 ]; then
-        tput setaf "$color"
-      fi
-      if [ "$count" -eq 1 ]; then
-        printf "%-${max_repo_len}s " "$part"
-      elif [ "$count" -eq 3 ]; then
-        if [ "$part" != "master" ] && [ "$part" != "main" ]; then
-          tput setaf 6
-        else
-          tput setaf 2
-        fi
-        printf "%-${max_branch_len}s " "$part"
-        tput sgr0
-      elif [ "$count" -eq 4 ]; then
-        printf "%-10s " "$part"
-      else
-        printf "%-5s " "$part"
-      fi
-      if [ "$count" -gt 2 ]; then
-        tput sgr0
-      fi
-    done
-    printf "\n"
+  shift
+  local record name pr_count branch version
+  for record in "$@"; do
+    IFS=$'\t' read -r name pr_count branch version <<<"$record"
+    printf "%-${max_repo_len}s " "$name"
+    printf "%-5s " "$pr_count"
+    if [ "$branch" != "master" ] && [ "$branch" != "main" ]; then
+      tput setaf 6
+    else
+      tput setaf 2
+    fi
+    printf "%-${max_branch_len}s " "$branch"
+    tput sgr0
+    tput setaf "$color"
+    printf "%-10s\n" "$version"
+    tput sgr0
   done
 }
 
-output 2 "$RELEASABLE"
-output 6 "$DEVELOPMENT"
-output 3 "$UNCOMMITTED"
-
-echo "${PULLS}"
+output 2 "${RELEASABLE[@]}"
+output 6 "${DEVELOPMENT[@]}"
+output 3 "${UNCOMMITTED[@]}"

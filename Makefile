@@ -6,6 +6,10 @@ all: package
 clean:
 	rm -rf dist
 
+.PHONY: test
+test:
+	bash tests/run.sh
+
 package: package_scripts
 
 publish: package gh-create-draft-release
