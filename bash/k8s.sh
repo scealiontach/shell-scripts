@@ -79,7 +79,8 @@ function k8s::pod_names_for_label() {
   local ns=${2:-}
   local args=(pods -l "$label" --field-selector=status.phase=Running -o name)
   [ -n "$ns" ] && args+=(-n "$ns")
-  k8s::get "${args[@]}" | awk -F/ '{print $2}'
+  # shellcheck disable=SC2016 # $2 is awk's positional, not a shell expansion
+  k8s::get "${args[@]}" | $(commands::use awk) -F/ '{print $2}'
 }
 
 function k8s::get_ns() {
