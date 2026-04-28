@@ -79,6 +79,7 @@ function options::add() {
   local description="no description"
   local parse_fn=""
   local environment_var=""
+  local opt
   while [ -n "$1" ]; do
     opt="$1"
     shift
@@ -125,7 +126,6 @@ function options::add() {
         ;;
     esac
   done
-  OPTARG=
   if [ -z "$option" ]; then
     echo "Invalid option specification"
     return 1
@@ -161,7 +161,9 @@ function options::syntax() {
   @arg _1_ the command specified
   local command=$1
   local spec=""
-  items=()
+  local items=()
+  local opt
+  local item
   for opt in "${OPTIONS[@]}"; do
     item="-${opt}"
     if [ "${OPTIONS_HAS_ARGS[$opt]}" = "true" ]; then
@@ -178,7 +180,10 @@ function options::syntax() {
 
 function options::doc() {
   @doc print the documentation for the options
-  count=0
+  local count=0
+  local opt
+  local mandatory
+  local args
   printf "%s\n" "OPTIONS"
   for opt in "${OPTIONS[@]}"; do
     local description="${OPTIONS_DOC[$opt]}"
