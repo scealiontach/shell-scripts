@@ -29,6 +29,7 @@ options::add -o c -d "container whose logs to dump" -a -m -e container
 options::parse "$@"
 shift $((OPTIND - 1))
 
+# shellcheck disable=SC2154 # selector/container exported by options::add -e
 get_pods_cmd=(k8s::ctl get pods -l "$selector" -o json)
 log::info "Fetching logs of pods for selector $selector container: ${container:?}"
 for pod in $("${get_pods_cmd[@]}" |
