@@ -53,6 +53,7 @@ function mapPods() {
 }
 
 TEMP_DIR=$(mktemp -d)
+trap 'rm -rf "$TEMP_DIR"' EXIT INT TERM
 log::info "using temporary directory $TEMP_DIR"
 function getKeys() {
   local pod=${1:?}
@@ -87,22 +88,33 @@ function unlabelNode() {
 }
 
 function labelNode() {
-  node=${1:?}
-  label=${2:?}
-  log::info "Removing label $label from node $node"
+  local node=${1:?}
+  local label=${2:?}
+  log::info "Adding label $label to node $node"
   k8s::ctl label node "$node" "$label"
 }
 
+# Maximum seconds to wait for a pod to terminate before giving up. Override
+# via the WAIT_FOR_POD_TERMINATION_TIMEOUT environment variable.
+WAIT_FOR_POD_TERMINATION_TIMEOUT=${WAIT_FOR_POD_TERMINATION_TIMEOUT:-600}
+
 function waitForPodTermination() {
   local pod=${1:?}
-  log::info "Waiting for pod $pod to terminate"
+  local timeout=${2:-$WAIT_FOR_POD_TERMINATION_TIMEOUT}
+  local deadline=$(($(date +%s) + timeout))
+  log::info "Waiting for pod $pod to terminate (timeout ${timeout}s)"
   while k8s::ctl get pod "$pod" -o name >/dev/null 2>&1; do
+    if [ "$(date +%s)" -ge "$deadline" ]; then
+      log::error "Timed out after ${timeout}s waiting for pod $pod to terminate"
+      return 1
+    fi
     sleep 5
     log::info "Waiting for pod $pod to terminate"
   done
 }
 
 function main() {
+  set -euo pipefail
   # shellcheck disable=SC2153
   mapPods "$LABEL"
   from_pod=${node2pod[$FROM_NODE]}
