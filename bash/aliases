@@ -37,15 +37,48 @@ function kss {
 }
 
 function update_eksctl {
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *)
+      echo "update_eksctl: unsupported architecture '$(uname -m)'" >&2
+      return 1
+      ;;
+  esac
   curl --silent --location \
-    "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" |
+    "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_${arch}.tar.gz" |
     tar xz -C /tmp
   mkdir -p "$HOME/.local/bin"
   mv /tmp/eksctl "$HOME/.local/bin"
 }
 
 function update_helm {
-  curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+  # Pinned version: bump manually after reviewing release notes.
+  # Avoids piping a network-fetched master-branch script straight to bash.
+  local helm_version=v3.16.4
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *)
+      echo "update_helm: unsupported architecture '$(uname -m)'" >&2
+      return 1
+      ;;
+  esac
+  local os
+  os=$(uname -s | tr '[:upper:]' '[:lower:]')
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "$tmpdir"' RETURN
+  if ! curl -fsSL -o "$tmpdir/helm.tgz" \
+    "https://get.helm.sh/helm-${helm_version}-${os}-${arch}.tar.gz"; then
+    echo "update_helm: download failed" >&2
+    return 1
+  fi
+  tar xz -C "$tmpdir" -f "$tmpdir/helm.tgz"
+  mkdir -p "$HOME/.local/bin"
+  mv "$tmpdir/${os}-${arch}/helm" "$HOME/.local/bin/helm"
 }
 
 function update_pip3_packages {
@@ -104,9 +137,11 @@ function ua {
 function get_latest_btp_branch {
   for d in *; do
     echo "Check $d"
-    if [ -d "$d/.git" ];then
+    if [ -d "$d/.git" ]; then
       cd "$d" || continue
-      for b in $(git branch -la|grep origin/btp-releases|sort|tail); do
+      # tail -n 1 to pick only the latest sorted branch; bare 'tail' defaults
+      # to -n 10 and would check out 10 branches sequentially.
+      for b in $(git branch -la | grep origin/btp-releases | sort | tail -n 1); do
         branch=${b##remotes/origin/}
         echo "Set $d to branch $branch"
         git checkout "$branch" "$@"
