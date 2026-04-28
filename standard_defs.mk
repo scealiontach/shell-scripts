@@ -319,7 +319,7 @@ build/$(REPO)-$(VERSION).zip:
 
 build/$(REPO)-$(VERSION).tgz:
 	if [ -d .git ]; then \
-	  git archive HEAD --format=zip -9 --output=build/$(REPO)-$(VERSION).tgz; \
+	  git archive HEAD --format=tar.gz -9 --output=build/$(REPO)-$(VERSION).tgz; \
 	fi
 
 $(MARKERS)/toolchain_vols:
