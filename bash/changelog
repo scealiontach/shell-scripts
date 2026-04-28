@@ -72,7 +72,9 @@ function ::date_to_commit_before() {
 
 function ::date_to_commit_after() {
   local theDate=${1:?}
-  git::cmd rev-list -n 1 --first-parent --before="$theDate" "$(::current_branch)"
+  # -n 1 is applied before --reverse in git rev-list, so we must use head -1
+  # post-reverse to actually obtain the first commit on or after the date.
+  git::cmd rev-list --first-parent --reverse --after="$theDate" "$(::current_branch)" | head -n 1
 }
 
 function ::full() {

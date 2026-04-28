@@ -25,12 +25,19 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 options::standard
 options::set_description "Cleans the target directory of branches which have \
-  lost their remote counterparts."
+  lost their remote counterparts. With -T, also deletes local and origin tags \
+  matching the build/* prefix (CI artifact tags); this destructive cleanup is \
+  off by default. Use -n for a dry run that prints intended deletions without \
+  touching anything."
 options::add -o d -d "target directory" -a -e TARGET_DIR
+options::add -o T -d "also clean build/* tags from local and origin (opt-in)" -x CLEAN_BUILD_TAGS
+options::add -o n -d "dry run: print intended deletions without executing" -x DRY_RUN
 options::parse_available "$@"
 
 # globals
 TARGET_DIR="${TARGET_DIR:-$(pwd)}"
+CLEAN_BUILD_TAGS=${CLEAN_BUILD_TAGS:-false}
+DRY_RUN=${DRY_RUN:-false}
 
 if [ ! -d "$TARGET_DIR/.git" ]; then
   error::exit "$TARGET_DIR is not the root of a git repository"
@@ -42,19 +49,37 @@ log::info "Fetching for repository $TARGET_DIR"
 exec::capture git::cmd fetch -p
 log::info "Checking for branches without remotes"
 for name in $(git::cmd branch -vv | grep -v '^\*' | grep -v "\[.*]" | awk '{print $1}'); do
-  log::info "Branch $name has no remote, deleting"
-  exec::capture git::cmd branch -D "$name"
+  if [ "$DRY_RUN" = "true" ]; then
+    log::info "would delete branch $name (no remote)"
+  else
+    log::info "Branch $name has no remote, deleting"
+    exec::capture git::cmd branch -D "$name"
+  fi
 done
 
 log::info "Checking for branches where the remote has been deleted"
 for branch in $(git::cmd branch -vv | grep ': gone]' | grep -v "\*" | awk '{ print $1; }'); do
-  log::info "Deleting $branch"
-  exec::capture git::cmd branch -D "$branch"
+  if [ "$DRY_RUN" = "true" ]; then
+    log::info "would delete branch $branch (remote gone)"
+  else
+    log::info "Deleting $branch"
+    exec::capture git::cmd branch -D "$branch"
+  fi
 done
 
-log::info "Checking for old build tags"
-for tag in $(git::cmd tag -l | grep build/); do
-  log::info "Deleting tag $tag"
-  exec::capture git::cmd push --delete origin "$tag"
-  exec::capture git::cmd tag -d "$tag"
-done
+if [ "$CLEAN_BUILD_TAGS" = "true" ]; then
+  log::info "Checking for old build/* tags (opt-in via -T)"
+  for tag in $(git::cmd tag -l 'build/*'); do
+    if [ "$DRY_RUN" = "true" ]; then
+      log::info "would delete tag $tag (local + origin)"
+    else
+      log::info "Deleting tag $tag"
+      exec::capture git::cmd push --delete origin "$tag"
+      exec::capture git::cmd tag -d "$tag"
+    fi
+  done
+else
+  if [ -n "$(git::cmd tag -l 'build/*')" ]; then
+    log::info "build/* tags present; pass -T to delete them (skipped)"
+  fi
+fi

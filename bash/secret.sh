@@ -17,6 +17,7 @@
 # shellcheck source=includer.sh
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
+@include annotations
 @include doc
 @include error
 @include exec
@@ -26,12 +27,23 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 declare -g -A SECRETS
 declare -g -A SECRETS_FILES
 declare -g -a SECRET_TMPFILES
+declare -g SECRET_TRAP_INSTALLED=${SECRET_TRAP_INSTALLED:-false}
+
+function secret::_install_cleanup_trap {
+  @doc Internal - install the EXIT/INT/TERM trap that calls secret::clear \
+    exactly once per shell. Must be invoked from the parent shell scope so \
+    the trap is in the right place. The registration helpers call this.
+  if [ "$SECRET_TRAP_INSTALLED" != "true" ]; then
+    trap 'secret::clear' EXIT INT TERM
+    SECRET_TRAP_INSTALLED=true
+  fi
+}
 
 function secret::register_env {
   @doc Register a secret under the provided name
   @arg _1_ the secret name
   @arg _2_ optional - the name of a different env var containing the secret val
-  set +x
+  { set +x; } 2>/dev/null
   local varName=${1:?}
   local targetVar=$2
   if [ -z "$targetVar" ]; then
@@ -41,18 +53,20 @@ function secret::register_env {
     SECRETS[$varName]="environment"
     declare -g -n "$varName=${targetVar}"
   fi
+  secret::_install_cleanup_trap
 }
 
 function secret::register_file {
   @doc Register a secret in the specified file under the provided name
   @arg _1_ the secret name
   @arg _2_ the file containing the secret
-  set +x
+  { set +x; } 2>/dev/null
   local varName=${1:?}
   local file=${2:?}
   SECRETS[$varName]="file"
   SECRETS_FILES[$varName]="$file"
   declare -g "$varName=$(cat "${SECRETS_FILES[$varName]}")"
+  secret::_install_cleanup_trap
 }
 
 function secret::exists {
@@ -96,15 +110,15 @@ function secret::must_exist {
 function secret::as_file {
   @doc Render the named secret as a temporary file and return the name
   @arg _1_ name of the secret
-  set +x
+  { set +x; } 2>/dev/null
   local secretName=${1:?}
   secret::must_exist "$secretName"
   case "${SECRETS[$secretName]}" in
     environment)
-      _env_as_file "$secretName"
+      secret::_env_as_file "$secretName"
       ;;
     file)
-      _file_as_file "$secretName"
+      secret::_file_as_file "$secretName"
       ;;
     *)
       return 1
@@ -112,24 +126,41 @@ function secret::as_file {
   esac
 }
 
-function _file_as_file {
-  set +x
+function secret::_file_as_file {
+  @doc Internal - return the path of a file-backed secret.
+  @arg _1_ name of the secret
+  { set +x; } 2>/dev/null
   local secretName=${1:?}
   printf "%s" "${SECRETS_FILES[$secretName]}"
 }
 
-function _env_as_file {
-  set +x
+function secret::_env_as_file {
+  @doc Internal - materialize an env-backed secret to a 0600 tempfile and \
+    echo the path. Errors out if the named env var is unset or empty.
+  @arg _1_ name of the env var holding the secret
+  { set +x; } 2>/dev/null
   local secretName=${1:?}
+  if [ -z "${!secretName-}" ]; then
+    error::exit "secret::_env_as_file: env var '$secretName' is unset or empty"
+  fi
   local tmpFile
   tmpFile=$(mktemp)
+  chmod 600 "$tmpFile"
   SECRET_TMPFILES+=("$tmpFile")
   (printenv "$secretName") >"$tmpFile"
   echo "$tmpFile"
 }
 
+function _file_as_file {
+  deprecated secret::_file_as_file "$@"
+}
+
+function _env_as_file {
+  deprecated secret::_env_as_file "$@"
+}
+
 function secret::clear {
-  @doc "Clear secret temprary files."
+  @doc Clear secret temporary files.
   if [ -n "${SECRET_TMPFILES[0]}" ]; then
     rm -f "${SECRET_TMPFILES[@]}"
   fi
