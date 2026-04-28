@@ -27,6 +27,7 @@ options::description "Opens a tmux session with panels for each of the pods\
  and containers specified running the provided command."
 options::add -o l -d "label to select for the console" -a -m -e LABEL
 options::add -o c -d "command to execute in the console" -a -m -e COMMAND
+options::add -o n -d "namespace to query (default: current context)" -a -e NAMESPACE
 options::parse "$@"
 shift $((OPTIND - 1))
 
@@ -48,8 +49,7 @@ log::debug "Create and select window $WINDOW"
 tmux::cmd new-window -n "$WINDOW"
 tmux::cmd select-window -t "$WINDOW"
 count=0
-for pod in $(k8s::ctl get pods -l "$LABEL" | grep -v Terminat | grep -v NAME |
-  awk '{print $1}' | sort); do
+for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
   if [ "$count" -gt 0 ]; then
     log::debug "Split window on session $SESSION"
     tmux::cmd split-window -v -t "$SESSION"

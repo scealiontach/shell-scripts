@@ -20,13 +20,18 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 @include commands
 @include k8s
 
+# Optional leading -n NAMESPACE flag; everything else is positional as before.
+NAMESPACE=
+if [ "${1:-}" = "-n" ]; then
+  NAMESPACE=$2
+  shift 2
+fi
 LABEL=$1
 shift
 COMMAND=$1
 shift
 clear
-for pod in $(k8s::ctl get pods -l "$LABEL" | grep -v Terminat |
-  grep -v NAME | awk '{print $1}' | sort); do
+for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
   node_name=$(k8s::ctl get pod "$pod" -o json |
     $(commands::use jq) -r '.spec.nodeName')
   echo "=== $node_name $pod ==="

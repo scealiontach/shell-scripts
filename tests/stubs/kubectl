@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Recording stub for kubectl. Writes the full argv to $KUBECTL_ARGV_LOG
+# (one invocation per line, args separated by spaces) and emits a fixed
+# `pod/<name>` listing on stdout so callers expecting `-o name` output
+# get something realistic.
+echo "$@" >>"${KUBECTL_ARGV_LOG:-/dev/null}"
+case "$*" in
+  *"-o name"*)
+    echo "pod/example-pod-1"
+    echo "pod/example-pod-2"
+    ;;
+esac
