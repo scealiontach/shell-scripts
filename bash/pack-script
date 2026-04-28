@@ -83,7 +83,7 @@ for inc in $(get_all_includes "${TargetFile:?}"); do
 done
 
 grep -v "^@include" "${TargetFile}" |
-  sed -E -e 's/BASH_SOURCE\[[0-9-]+\]/BASH_SOURCE[0]/g' |
+  sed -E -e 's/BASH_SOURCE\[-?[0-9]+\]/BASH_SOURCE[0]/g' |
   grep -v "includer.sh" |
   grep -v "^#!" >>"${OutputFile:?}"
 

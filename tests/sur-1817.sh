@@ -26,9 +26,14 @@ if ! "$REPO_ROOT/bash/pack-script" -f "$fixture" -o "$out" >/dev/null 2>&1; then
   exit 1
 fi
 
-# Sanity: the packed file should contain a rewritten reference (proving the
-# pipeline actually ran) and at least one BASH_SOURCE token from the fixture.
-assert_zero "$?" "pack-script ran" || failures=$((failures + 1))
+# Sanity: the packed file should be non-empty (proving the pipeline actually
+# ran and wrote content). The earlier `if ! pack-script ...; then exit 1; fi`
+# guarantees a zero exit, so $? here would always be 0; assert on the artifact
+# instead.
+[ -s "$out" ] || {
+  echo "FAIL: packed output is empty" >&2
+  failures=$((failures + 1))
+}
 
 # After the fix, no BASH_SOURCE[<non-zero or negative>] should remain in the
 # packed body that came from the target file. Note: doc.sh / annotations.sh /
