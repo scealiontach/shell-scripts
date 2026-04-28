@@ -40,23 +40,38 @@ function dirs::of() {
 }
 
 function dirs::safe_rmrf {
-  @doc an rm -rf command that refuses to delete certain paths.
+  @doc an rm -rf command that refuses to delete dangerous paths. \
+    Refuses empty strings, dot, dotdot, tilde, slash, double-slash, paths \
+    containing glob metacharacters such as star, question mark, or open \
+    bracket, and any path whose readlink -f resolution is empty, slash, or \
+    HOME. Validates all arguments before deleting any, so a bad arg in \
+    position N does not delete args 1 through N-1.
   @arg _@_ the list of paths to remove
+  local path resolved
   for path in "$@"; do
-    case $path in
-      /)
-        log::warn "Attempt to delete $path is forbidden"
+    case "$path" in
+      "" | . | .. | "~" | / | //)
+        log::error "Attempt to delete forbidden path '$path' refused"
         return 1
         ;;
-      *)
-        log::trace "$path passes safe_rmrf check"
+      *[\*\?\[]*)
+        log::error "Attempt to delete glob-bearing path '$path' refused"
+        return 1
         ;;
     esac
+    resolved=$(readlink -f -- "$path" 2>/dev/null || true)
+    case "$resolved" in
+      "" | / | "$HOME")
+        log::error "Attempt to delete '$path' (resolved to '$resolved') refused"
+        return 1
+        ;;
+    esac
+    log::trace "$path passes safe_rmrf check"
   done
   for path in "$@"; do
     log::trace "removing $path"
-    if [ -r "$path" ]; then
-      if ! rm -rf "$path"; then
+    if [ -e "$path" ] || [ -L "$path" ]; then
+      if ! rm -rf -- "$path"; then
         log::debug "failed to remove $path"
         return 1
       fi
