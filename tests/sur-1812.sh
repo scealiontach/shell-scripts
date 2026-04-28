@@ -11,6 +11,12 @@ source "$TEST_DIR/lib/assert.sh"
 
 failures=0
 
+# Skip cleanly if mktemp isn't reachable on PATH.
+if ! command -v mktemp >/dev/null; then
+  echo "sur-1812: skip — mktemp not on PATH" >&2
+  exit 0
+fi
+
 # Allocate a parent tmp dir; clean up unconditionally.
 tmp_parent=$(mktemp -d)
 trap 'rm -rf "$tmp_parent"' EXIT

@@ -9,6 +9,12 @@ source "$TEST_DIR/lib/assert.sh"
 
 failures=0
 
+# Skip cleanly if bash isn't reachable on PATH (unusual CI image guard).
+if ! command -v bash >/dev/null; then
+  echo "sur-1810: skip — bash not on PATH" >&2
+  exit 0
+fi
+
 # Test A: commands::use bash returns a non-empty path AND populates $_bash.
 a_out=$(
   # shellcheck source=/dev/null
@@ -36,7 +42,7 @@ b_out=$(
   @include commands
   commands::use bash >/dev/null
   # Now break command -v so any non-cached lookup would fall through to err.
-  # shellcheck disable=SC2329
+  # shellcheck disable=SC2329,SC2317
   command() {
     if [ "$1" = "-v" ]; then
       return 1

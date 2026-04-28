@@ -54,7 +54,7 @@ b2_count=$(
   # shellcheck source=/dev/null
   source "$REPO_ROOT/bash/includer.sh"
   log_source_count=0
-  # shellcheck disable=SC2329
+  # shellcheck disable=SC2329,SC2317
   source() {
     case "$1" in
       */log.sh) log_source_count=$((log_source_count + 1)) ;;
