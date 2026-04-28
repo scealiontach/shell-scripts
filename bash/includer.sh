@@ -34,8 +34,8 @@ function @include {
       source "$true_file"
     fi
   else
-    echo "Cannot find include file $true_file"
-    exit 1
+    echo "Cannot find include file $true_file" >&2
+    return 1
   fi
 }
 

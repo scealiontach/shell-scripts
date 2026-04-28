@@ -34,13 +34,12 @@ function commands::use {
   @doc Find the specified command on the PATH if available or error
   @arg _1_ the base command name to find
   local cmd=${1:?}
-  # shellcheck disable=SC2154
-  if [ -z "$_cmd" ]; then
+  local var=_${cmd}
+  if [ -z "${!var}" ]; then
     local cmd_path
     cmd_path=$(command -v "$cmd") || commands::err_not_found "$cmd"
-    declare -g "_${cmd}=$cmd_path"
+    declare -g "${var}=$cmd_path"
   fi
-  local var=_${cmd}
   echo "${!var}"
   return
 }
