@@ -34,7 +34,12 @@ options::add -o z -d "acs batch size" -a -e ACS_BATCH_SIZE
 options::parse "$@"
 shift $((OPTIND - 1))
 
-set -x
+# Gate xtrace on -v -v (LOG_LEVEL>=2) instead of unconditionally enabling it.
+# options::standard's -v flag drives log::level_increase, so two -v flags
+# raise LOG_LEVEL to 2 (INFO and above).
+if [ "${LOG_LEVEL:-0}" -ge 2 ]; then
+  set -x
+fi
 START_OFFSET=${START_OFFSET:-0}
 STEPPING=${STEPPING:-5000}
 MAX_PARALLEL=${MAX_PARALLEL:-5}
@@ -74,24 +79,17 @@ function exportRange {
     rm -rf -- "$base_dir"*
     rm -rf "$dir"
     mkdir -p "$dir"
-    if [ -z "$DAML_TOKEN" ]; then
-      #-Dlogback.configurationFile=$HOME/.daml/sdk/${DAML_VERSION}/daml-sdk/export-logback.xml \
-      java -Xmx32000m \
-        -jar "$HOME/.daml/sdk/${DAML_VERSION}/daml-sdk/daml-sdk.jar" \
-        export script --all-parties --sdk-version "${EXPORT_SDK}" \
-        --acs-batch-size "${ACS_BATCH_SIZE}" \
-        -o "$dir" --host "$DAML_HOST" --port "$DAML_PORT" \
-        --start "$start$_extra" --end "$stop$_extra"
-    else
-      java -Xmx32000m \
-        -jar "$HOME/.daml/sdk/${DAML_VERSION}/daml-sdk/daml-sdk.jar" \
-        export script --all-parties --sdk-version "${EXPORT_SDK}" \
-        --acs-batch-size "${ACS_BATCH_SIZE}" \
-        -o "$dir" --host "$DAML_HOST" --port "$DAML_PORT" \
-        --start "$start$_extra" --end "$stop$_extra" \
-        --access-token-file "$DAML_TOKEN"
-    fi
-    export_exit=$?
+    local args=(
+      -Xmx32000m
+      -jar "$HOME/.daml/sdk/${DAML_VERSION}/daml-sdk/daml-sdk.jar"
+      export script --all-parties --sdk-version "${EXPORT_SDK}"
+      --acs-batch-size "${ACS_BATCH_SIZE}"
+      -o "$dir" --host "$DAML_HOST" --port "$DAML_PORT"
+      --start "$start$_extra" --end "$stop$_extra"
+    )
+    [ -n "$DAML_TOKEN" ] && args+=(--access-token-file "$DAML_TOKEN")
+    java "${args[@]}"
+    local export_exit=$?
     if [ $export_exit -eq 0 ]; then
       touch "$dir/export.good"
     else
@@ -169,6 +167,20 @@ STOP_INT=$(hex_to_dec "$STOP_OFFSET")
 count=0
 RUNNING_PROCS=()
 TO_BUILD=()
+
+# Kill any background `daml build` jobs we still know about on script
+# exit or Ctrl-C so they don't keep running after the user gives up.
+# `kill -0` guards against already-reaped pids, and stderr is swallowed
+# so the trap stays quiet on normal completion.
+function ::kill_running_procs {
+  local pid
+  for pid in "${RUNNING_PROCS[@]}"; do
+    if kill -0 "$pid" 2>/dev/null; then
+      kill "$pid" 2>/dev/null || true
+    fi
+  done
+}
+trap ::kill_running_procs EXIT INT TERM
 
 while [ "$CUR_INT" -le "$STOP_INT" ] && [ "$CUR_INT" != "$NEXT_INT" ]; do
 
