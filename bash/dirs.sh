@@ -85,7 +85,10 @@ function dirs::noreplace {
   @doc Return an error if the directory exists and is not empty, otherwise ensure that it exists
   @arg _1_ the directory
   local directory=${1:?}
-  log::notice "This command will replace the contents ${1}"
+  if [ -d "$directory" ] && [ -n "$(ls -A "$directory" 2>/dev/null)" ]; then
+    error::exit "Directory $directory exists and is not empty; refusing to replace"
+  fi
+  dirs::ensure "$directory"
 }
 
 function dirs::ensure {
