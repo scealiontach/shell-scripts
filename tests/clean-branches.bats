@@ -34,6 +34,13 @@ setup() {
   # feature/keep: current branch (also no upstream, but we must not delete it).
   git -C "$LOCAL_DIR" checkout -q -b feature/keep
 
+  # build/1.0: pushed to origin so -T can delete it from both sides.
+  git -C "$LOCAL_DIR" tag build/1.0
+  git -C "$LOCAL_DIR" push -q origin build/1.0
+
+  # v0.1.0: local-only tag that -T must leave untouched.
+  git -C "$LOCAL_DIR" tag v0.1.0
+
   export ORIGIN_DIR LOCAL_DIR CLEAN
 }
 
@@ -64,4 +71,13 @@ teardown() {
   [[ "$branches" == *"main"* ]]
   [[ "$branches" != *"feature/gone"* ]]
   [[ "$branches" != *"feature/no-upstream"* ]]
+}
+
+@test "-T flag deletes build/* tags and preserves non-build tags" {
+  run "$CLEAN" -d "$LOCAL_DIR" -T -v -v
+  [ "$status" -eq 0 ]
+  build_tags=$(git -C "$LOCAL_DIR" tag -l 'build/*')
+  [ -z "$build_tags" ]
+  v_tags=$(git -C "$LOCAL_DIR" tag -l 'v0.1.0')
+  [ "$v_tags" = "v0.1.0" ]
 }
