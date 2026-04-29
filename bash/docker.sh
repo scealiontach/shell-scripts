@@ -74,6 +74,7 @@ function docker::cp() {
   @arg _2_ destination
   local from=${1:?}
   local to=${2:?}
+  local exit_code
   if docker::pull "$from"; then
     if docker::tag "$from" "$to"; then
       if docker::push "$to"; then
@@ -128,6 +129,7 @@ function docker::cp_if_different() {
   @arg _2_ destination
   local from=${1:?}
   local to=${2:?}
+  local exit_code
   if docker::pull "$from"; then
     if docker::pull "$to"; then
       #if $from and $to are the same, then return

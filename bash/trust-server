@@ -33,13 +33,13 @@ options::parse "$@"
 # shellcheck disable=2153
 _FQDN=${FQDN//./_}
 
-HOSTNAME=$(echo "$FQDN" | awk -F. '{print $1}')
-DOMAIN=${FQDN/#${HOSTNAME}./}
+cert_host=$(echo "$FQDN" | awk -F. '{print $1}')
+cert_domain=${FQDN/#${cert_host}./}
 
 CERT_GROUP="local"
-if [ -n "$DOMAIN" ]; then
+if [ -n "$cert_domain" ]; then
   # shellcheck disable=2034
-  CERT_GROUP="$DOMAIN"
+  CERT_GROUP="$cert_domain"
 fi
 
 TMPDIR=$(mktemp -d)
@@ -70,8 +70,9 @@ find . -name "*.crt" | while read -r cert; do
 done
 
 function add-certs-amzn() {
+  local fqdn_pem=${1:?}
   for cert in *.pem; do
-    if [ "$cert" = "${_FQDN}.pem" ]; then
+    if [ "$cert" = "$fqdn_pem" ]; then
       continue
     fi
     log::info "Copying $cert to /etc/pki/ca-trust/source/anchors/"
@@ -82,8 +83,9 @@ function add-certs-amzn() {
 }
 
 function add-certs-ubuntu() {
+  local fqdn_pem=${1:?}
   for cert in *.pem; do
-    if [ "$cert" = "${_FQDN}.pem" ]; then
+    if [ "$cert" = "$fqdn_pem" ]; then
       continue
     fi
     log::info "Copying $cert to /etc/ssl/certs"
@@ -95,9 +97,9 @@ function add-certs-ubuntu() {
 
 case $ID in
   amzn)
-    add-certs-amzn
+    add-certs-amzn "${_FQDN}.pem"
     ;;
   ubuntu | pop)
-    add-certs-ubuntu
+    add-certs-ubuntu "${_FQDN}.pem"
     ;;
 esac

@@ -52,10 +52,11 @@ function wait_for_change() {
   local current_version
   current_version="$start_version"
   log::trace "Start version $start_version"
+  local cmd_input
   while [ "$start_version" = "$current_version" ]; do
     log::trace "Waiting $wait_time for changes"
-    read -r -t "$wait_time" COMMAND
-    if [ "$COMMAND" = "X" ]; then
+    read -r -t "$wait_time" cmd_input
+    if [ "$cmd_input" = "X" ]; then
       current_version="go"
     else
       current_version=$(find "$WatchDir" -type f -ls 2>/dev/null | sort | cksum)
