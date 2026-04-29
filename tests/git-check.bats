@@ -65,3 +65,38 @@ init_repo() {
   echo "$clean" | grep -E 'orgA/repoA[[:space:]].*[[:space:]]branchA[[:space:]]'
   echo "$clean" | grep -E 'orgB/repoB[[:space:]].*[[:space:]]branchB[[:space:]]'
 }
+
+@test "git-check buckets a repo with uncommitted changes as UNCOMMITTED" {
+  mkdir -p "$HOME/git/uchk/org"
+  helpers::make_fixture_repo "$HOME/git/uchk/org/repo" --tagged
+  # Unstaged modification causes --dirty to append the -dirty suffix.
+  echo "dirty" >>"$HOME/git/uchk/org/repo/README"
+
+  run bash -c "'$GIT_CHECK' -b uchk 2>/dev/null"
+  clean=$(printf '%s\n' "$output" | sed -E $'s/\x1B\\[[0-9;]*[A-Za-z]//g')
+  echo "$clean" | grep -E 'org/repo'
+  echo "$clean" | grep '\-dirty'
+}
+
+@test "git-check buckets a clean repo at a tag as RELEASABLE" {
+  mkdir -p "$HOME/git/rchk/org"
+  helpers::make_fixture_repo "$HOME/git/rchk/org/repo" --tagged
+
+  run bash -c "'$GIT_CHECK' -b rchk 2>/dev/null"
+  clean=$(printf '%s\n' "$output" | sed -E $'s/\x1B\\[[0-9;]*[A-Za-z]//g')
+  echo "$clean" | grep -E 'org/repo'
+  echo "$clean" | grep -E 'v0\.3\.0[[:space:]]'
+}
+
+@test "git-check buckets a clean repo ahead of a tag as DEVELOPMENT" {
+  mkdir -p "$HOME/git/dchk/org"
+  helpers::make_fixture_repo "$HOME/git/dchk/org/repo" --tagged
+  echo "extra" >>"$HOME/git/dchk/org/repo/README"
+  git -C "$HOME/git/dchk/org/repo" add README
+  git -C "$HOME/git/dchk/org/repo" -c commit.gpgsign=false commit -q -m "feat: extra"
+
+  run bash -c "'$GIT_CHECK' -b dchk 2>/dev/null"
+  clean=$(printf '%s\n' "$output" | sed -E $'s/\x1B\\[[0-9;]*[A-Za-z]//g')
+  echo "$clean" | grep -E 'org/repo'
+  echo "$clean" | grep -E 'v0\.3\.0-[0-9]+-g'
+}
