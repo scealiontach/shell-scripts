@@ -47,25 +47,39 @@ cd "$TARGET_DIR" || error::exit "Failed to cd to $TARGET_DIR, check permissions"
 
 log::info "Fetching for repository $TARGET_DIR"
 exec::capture git::cmd fetch -p
-log::info "Checking for branches without remotes"
-for name in $(git::cmd branch -vv | grep -v '^\*' | grep -v "\[.*]" | awk '{print $1}'); do
-  if [ "$DRY_RUN" = "true" ]; then
-    log::info "would delete branch $name (no remote)"
-  else
-    log::info "Branch $name has no remote, deleting"
-    exec::capture git::cmd branch -D "$name"
-  fi
-done
 
-log::info "Checking for branches where the remote has been deleted"
-for branch in $(git::cmd branch -vv | grep ': gone]' | grep -v "\*" | awk '{ print $1; }'); do
+# Single loop driven by `git for-each-ref` (requires git >= 2.7 for the
+# `%(upstream:track)` format, which produces `[gone]` when the upstream
+# has been pruned). The previous implementation ran two near-identical
+# loops over `git branch -vv`; the regex `\[.*]` was a glob class, not a
+# literal match, and the iterator name and log message diverged.
+function delete_branch() {
+  local branch=$1
+  local reason=$2
   if [ "$DRY_RUN" = "true" ]; then
-    log::info "would delete branch $branch (remote gone)"
+    log::info "would delete branch $branch ($reason)"
   else
-    log::info "Deleting $branch"
+    log::info "Deleting branch $branch ($reason)"
     exec::capture git::cmd branch -D "$branch"
   fi
-done
+}
+
+current_branch=$(git::cmd rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+log::info "Checking for branches to clean (current: ${current_branch:-<none>})"
+while IFS=$'\t' read -r branch upstream track; do
+  [ -z "$branch" ] && continue
+  # Never delete the branch we are standing on.
+  if [ "$branch" = "$current_branch" ]; then
+    continue
+  fi
+  if [ -z "$upstream" ]; then
+    delete_branch "$branch" "no remote"
+  elif [[ "$track" == *"gone"* ]]; then
+    delete_branch "$branch" "remote gone"
+  fi
+done < <(git::cmd for-each-ref \
+  --format='%(refname:short)%09%(upstream:short)%09%(upstream:track)' \
+  refs/heads/)
 
 if [ "$CLEAN_BUILD_TAGS" = "true" ]; then
   log::info "Checking for old build/* tags (opt-in via -T)"
