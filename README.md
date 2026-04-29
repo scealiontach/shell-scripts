@@ -85,3 +85,56 @@ make what_version        # print VERSION / LONG_VERSION / MAVEN_REVISION
   `ci:`, …). `commitizen` enforces this at the `commit-msg` stage.
 * Run `pre-commit run --all-files` before opening a PR; CI runs the same
   hooks (excluding `no-commit-to-branch`).
+
+## Shell aliases (`bash/aliases`)
+
+`bash/aliases` is a sourceable file of interactive shell helpers — add it to
+your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+source /path/to/shell-scripts/bash/aliases
+```
+
+It is **not** a command script and should not be added to `$PATH` directly.
+
+Function families:
+
+* **`k*` kubectl aliases** — `k`, `ku`, `kc`, `kn`, `kd`, `kl`, `kg`, `ke`,
+  `kls`, `klc`, `klu`, `kln`; plus `ks` / `kss` for interactive exec into
+  pods using bash or sh.
+* **`update_*` binary updaters** — `update_helm`, `update_eksctl`,
+  `update_kubectl`, `update_pip3_packages`, `update_packages`,
+  `update_vundle`.
+* **`ua` aggregator** — runs all `update_*` functions in sequence.
+* **`get_latest_btp_branch`** — checks out the latest `btp-releases` branch
+  across subdirectories.
+
+**Security note:** `update_eksctl` and `update_kubectl` verify SHA-256 checksums
+before installing (SUR-1863). `update_helm` uses an isolated temp dir with
+`trap RETURN` cleanup but does not currently verify its download checksum.
+
+## Build infrastructure (`standard_defs.mk`)
+
+`standard_defs.mk` is a GNU Make include that most build targets in this
+repository delegate to. See `AGENTS.md` for the canonical list of common
+commands.
+
+Published targets:
+
+| Target | Description |
+|--------|-------------|
+| `build` | Compile / assemble artefacts |
+| `test` | Run bats library specs and sprint regression scripts |
+| `package` | Build all three tarballs into `dist/` |
+| `analyze` | Run FOSSA licence analysis (requires `FOSSA_API_KEY`) |
+| `archive` | Upload artefacts to a release archive |
+| `publish` | Tag-driven `gh release` upload (see `RELEASABLE` below) |
+| `gh-create-draft-release` | Create a draft GitHub release |
+| `what_version` | Print `VERSION`, `LONG_VERSION`, and `MAVEN_REVISION` |
+
+`RELEASABLE` is set to `yes` only when the current commit is exactly on a git
+tag (`LONG_VERSION != VERSION` because `git describe --long` always appends
+the commit-count suffix) **and** the working tree is clean. `make publish`
+gate-checks this flag before uploading.
+
+The toolchain image is `blockchaintp/toolchain:latest`.

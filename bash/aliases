@@ -37,6 +37,10 @@ function kss {
 }
 
 function update_eksctl {
+  # Pinned version: bump manually after reviewing release notes.
+  # Override at runtime: EKSCTL_VERSION=v0.210.0 update_eksctl
+  # Checksum URL: https://github.com/weaveworks/eksctl/releases/download/VERSION/eksctl_checksums.txt
+  local eksctl_version=${EKSCTL_VERSION:-v0.207.0}
   local arch
   case "$(uname -m)" in
     x86_64) arch=amd64 ;;
@@ -46,11 +50,44 @@ function update_eksctl {
       return 1
       ;;
   esac
-  curl --silent --location \
-    "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_${arch}.tar.gz" |
-    tar xz -C /tmp
+  local os
+  os=$(uname -s)
+  local tmpdir
+  tmpdir=$(mktemp -d)
+  trap 'rm -rf "$tmpdir"' RETURN
+  local tarball="eksctl_${os}_${arch}.tar.gz"
+  local base_url="https://github.com/weaveworks/eksctl/releases/download/${eksctl_version}"
+  if ! curl -fsSL -o "$tmpdir/${tarball}" "${base_url}/${tarball}"; then
+    echo "update_eksctl: download failed" >&2
+    return 1
+  fi
+  if ! curl -fsSL -o "$tmpdir/eksctl_checksums.txt" "${base_url}/eksctl_checksums.txt"; then
+    echo "update_eksctl: checksum file download failed" >&2
+    return 1
+  fi
+  # Verify SHA-256: extract the hash for our tarball and check against the download.
+  local expected_hash
+  expected_hash=$(grep -F " ${tarball}" "$tmpdir/eksctl_checksums.txt" | awk '{print $1}')
+  if [ -z "$expected_hash" ]; then
+    echo "update_eksctl: ${tarball} not found in checksums file" >&2
+    return 1
+  fi
+  local -a sha_cmd
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha_cmd=(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then
+    sha_cmd=(shasum -a 256)
+  else
+    echo "update_eksctl: no sha256 tool found (install coreutils or shasum)" >&2
+    return 1
+  fi
+  if ! echo "${expected_hash}  $tmpdir/${tarball}" | "${sha_cmd[@]}" --check --status; then
+    echo "update_eksctl: SHA-256 verification failed" >&2
+    return 1
+  fi
+  tar xz -C "$tmpdir" -f "$tmpdir/${tarball}"
   mkdir -p "$HOME/.local/bin"
-  mv /tmp/eksctl "$HOME/.local/bin"
+  mv "$tmpdir/eksctl" "$HOME/.local/bin/"
 }
 
 function update_helm {
@@ -109,16 +146,53 @@ function update_packages {
 }
 
 function update_kubectl {
-  local latest
-  latest=$(curl -s \
-    https://storage.googleapis.com/kubernetes-release/release/stable.txt)
+  # Version is queried live from dl.k8s.io/release/stable.txt.
+  # Override at runtime: KUBECTL_VERSION=v1.32.0 update_kubectl
+  # Checksum URL: https://dl.k8s.io/release/VERSION/bin/OS/ARCH/kubectl.sha256
+  local version=${KUBECTL_VERSION:-}
+  if [ -z "$version" ]; then
+    version=$(curl -fsSL https://dl.k8s.io/release/stable.txt)
+  fi
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch=amd64 ;;
+    aarch64 | arm64) arch=arm64 ;;
+    *)
+      echo "update_kubectl: unsupported architecture '$(uname -m)'" >&2
+      return 1
+      ;;
+  esac
+  local os
+  os=$(uname -s | tr '[:upper:]' '[:lower:]')
+  local tmpdir
   tmpdir=$(mktemp -d)
-  cd "${tmpdir}" || return 1
-  curl -LO \
-  "https://storage.googleapis.com/kubernetes-release/release/${latest}/bin/linux/amd64/kubectl"
-  chmod +x kubectl
-  mv ./kubectl "$HOME/.local/bin"
-  cd - || return 1
+  trap 'rm -rf "$tmpdir"' RETURN
+  local base_url="https://dl.k8s.io/release/${version}/bin/${os}/${arch}"
+  if ! curl -fsSL -o "$tmpdir/kubectl" "${base_url}/kubectl"; then
+    echo "update_kubectl: download failed" >&2
+    return 1
+  fi
+  if ! curl -fsSL -o "$tmpdir/kubectl.sha256" "${base_url}/kubectl.sha256"; then
+    echo "update_kubectl: checksum file download failed" >&2
+    return 1
+  fi
+  # kubectl.sha256 contains only the hash (no filename); construct the check input.
+  local expected_hash
+  expected_hash=$(cat "$tmpdir/kubectl.sha256")
+  local -a sha_cmd
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha_cmd=(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then
+    sha_cmd=(shasum -a 256)
+  else
+    echo "update_kubectl: no sha256 tool found (install coreutils or shasum)" >&2
+    return 1
+  fi
+  if ! echo "${expected_hash}  $tmpdir/kubectl" | "${sha_cmd[@]}" --check --status; then
+    echo "update_kubectl: SHA-256 verification failed" >&2
+    return 1
+  fi
+  install -m 0755 "$tmpdir/kubectl" "$HOME/.local/bin/kubectl"
 }
 
 function update_vundle {

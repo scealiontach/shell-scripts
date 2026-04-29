@@ -13,4 +13,8 @@ CLAUDE-ONLY markers to make drift detection mechanical.
 This file provides guidance to Claude Code (claude.ai/code) when
 working with code in this repository.
 
+The "Hook bypass exceptions" section in AGENTS.md documents the one
+permitted use of `git commit --no-verify` (in `bash/update-repo-tags`
+during a CI release). All other uses of `--no-verify` are prohibited.
+
 <!-- /CLAUDE-ONLY -->

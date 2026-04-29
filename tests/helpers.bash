@@ -19,6 +19,10 @@ helpers::isolate_home() {
   HOME=$h
   export HOME
   unset XDG_CONFIG_HOME GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM
+  # Unset git plumbing env vars that git sets when running hooks.  Without
+  # this, git -C <tmpdir> calls inside tests inherit the outer GIT_DIR and
+  # operate on the project repo instead of the intended temp repo.
+  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY
 }
 
 # Deterministic git author/committer identity for tests that exercise

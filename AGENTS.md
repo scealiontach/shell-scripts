@@ -166,4 +166,17 @@ Two additional public entry points exist for less common cases:
   errors out if missing. Prefer `$(commands::use awk)` over bare `awk` in
   libraries that should fail loudly when a tool is absent.
 
+## Hook bypass exceptions
+
+The "never skip hooks" rule in this repository (and enforced by AI agents via
+CLAUDE.md) has one documented exception:
+
+**Release tagging (`bash/update-repo-tags`):** The `git commit --no-verify`
+call on the regenerated `CHANGELOG.md` is intentional. Pre-commit hooks cannot
+run reliably in CI's non-interactive context at release time (markdownlint may
+flag mechanically generated content; network access for hook installs is
+restricted). The source commits that triggered the release already passed
+pre-commit on their own branches. See the inline comment in
+`bash/update-repo-tags` for details. (SUR-1879)
+
 Linear Project: shell-scripts
