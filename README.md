@@ -109,9 +109,9 @@ Function families:
 * **`get_latest_btp_branch`** — checks out the latest `btp-releases` branch
   across subdirectories.
 
-**Security note:** `update_helm` verifies its download against the official
-checksum before installing. `update_eksctl` and `update_kubectl` have been
-hardened with SHA-256 verification and temp-dir cleanup (SUR-1863).
+**Security note:** `update_eksctl` and `update_kubectl` verify SHA-256 checksums
+before installing (SUR-1863). `update_helm` uses an isolated temp dir with
+`trap RETURN` cleanup but does not currently verify its download checksum.
 
 ## Build infrastructure (`standard_defs.mk`)
 
