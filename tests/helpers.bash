@@ -34,6 +34,34 @@ helpers::set_git_identity() {
   export GIT_COMMITTER_EMAIL="bats@example.invalid"
 }
 
+# helpers::make_fixture_repo <dir> [--tagged]
+# Creates a minimal git repo at <dir> with one commit (or three tagged commits
+# when --tagged is passed). Calls helpers::set_git_identity internally so
+# callers need not do so first.
+helpers::make_fixture_repo() {
+  local dir=${1:?dir required}
+  local tagged=${2:-}
+  git init -q -b main "$dir"
+  (
+    cd "$dir" || exit 1
+    helpers::set_git_identity
+    touch README
+    git add README
+    git -c commit.gpgsign=false commit -q -m "feat: initial"
+    if [[ "$tagged" == "--tagged" ]]; then
+      git tag v0.1.0
+      echo "a" >>README
+      git add README
+      git -c commit.gpgsign=false commit -q -m "feat: second"
+      git tag v0.2.0
+      echo "b" >>README
+      git add README
+      git -c commit.gpgsign=false commit -q -m "feat: third"
+      git tag v0.3.0
+    fi
+  )
+}
+
 # Source a library by its @include name. Forces a fresh include in the
 # current shell so the cksum-keyed dedup guard cannot suppress it.
 helpers::source_lib() {

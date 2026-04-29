@@ -25,3 +25,33 @@ setup() {
   "
   [ "$status" -eq 0 ]
 }
+
+@test "aws::is_scan_complete returns 0 when scan status is COMPLETE" {
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    aws::scan_status() { echo 'COMPLETE'; }
+    aws::is_scan_complete myrepo mytag
+  "
+  [ "$status" -eq 0 ]
+}
+
+@test "aws::is_scan_complete returns 1 when scan status is IN_PROGRESS" {
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    aws::scan_status() { echo 'IN_PROGRESS'; }
+    aws::is_scan_complete myrepo mytag
+  "
+  [ "$status" -ne 0 ]
+}
+
+@test "aws::is_scan_complete returns 1 for any non-COMPLETE status" {
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    aws::scan_status() { echo 'FAILED'; }
+    aws::is_scan_complete myrepo mytag
+  "
+  [ "$status" -ne 0 ]
+}
