@@ -79,13 +79,14 @@ function ::date_to_commit_after() {
 
 function ::full() {
   local later_tag=
+  local this_version long_version header_version change_count
   echo "# CHANGELOG"
   echo
   for tag in $(git::tagsinhistory); do
     if [ -z "$later_tag" ]; then
       later_tag="$tag"
-      this_version=$(git describe --tags)
-      long_version=$(git describe --tags --long)
+      this_version=$(git::describe --tags)
+      long_version=$(git::describe --tags --long)
       if [ "$this_version" = "$long_version" ]; then
         header_version="Unreleased"
       else
@@ -112,6 +113,7 @@ function ::full() {
   done
 }
 
+declare to_commit from_commit
 if [ -n "$TO_DATE" ]; then
   to_commit=$(::date_to_commit_before "$TO_DATE")
 fi
