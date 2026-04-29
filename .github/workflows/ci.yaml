@@ -1,4 +1,19 @@
 ---
+# Copyright © 2023 Kevin T. O'Donnell
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ----------------------------------------------------------------------------
+#
 # SUR-1853: replaces the legacy Jenkinsfile (Fetch Tags / Build / Package /
 # Analyze / Test / Create Archive / Publish). The pre-commit hooks live in
 # .github/workflows/pre-commit.yaml and are intentionally not duplicated
@@ -17,6 +32,12 @@ jobs:
   build:
     name: build / test / package / archive
     runs-on: ubuntu-latest
+    # Lift FOSSA_API_KEY to job scope so both the gated Analyze step and
+    # its companion "skipped" step read the same value via env.* without
+    # duplicating the `${{ secrets.FOSSA_API_KEY }}` expansion at every
+    # step that needs to introspect its presence.
+    env:
+      FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
     steps:
       - name: Checkout (full history + tags)
         uses: actions/checkout@v4
@@ -45,14 +66,10 @@ jobs:
       # any environment without the secret) skip it cleanly.
       - name: Analyze (FOSSA, gated)
         if: ${{ env.FOSSA_API_KEY != '' }}
-        env:
-          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
         run: make analyze
 
       - name: Analyze (skipped — no FOSSA secret)
         if: ${{ env.FOSSA_API_KEY == '' }}
-        env:
-          FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
         run: echo "FOSSA_API_KEY not set; skipping make analyze."
 
       - name: Test
