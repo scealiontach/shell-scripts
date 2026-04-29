@@ -309,7 +309,7 @@ analyze_sonar_js:
 	        -Dsonar.javascript.lcov.reportPaths=build/lcov.info; \
 	  fi
 
-.PHONY: archive_git
+.PHONY: archive_git build/$(REPO)-$(VERSION).zip build/$(REPO)-$(VERSION).tgz
 archive_git: build/$(REPO)-$(VERSION).zip build/$(REPO)-$(VERSION).tgz
 
 build/$(REPO)-$(VERSION).zip:
