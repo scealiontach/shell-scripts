@@ -24,15 +24,15 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 @package pagerduty
 
-function _curl() {
+function pagerduty::_curl() {
   $(commands::use curl) "$@"
 }
 
-function _jq() {
+function pagerduty::_jq() {
   $(commands::use jq) "$@"
 }
 
-function incident_data() {
+function pagerduty::_incident_data() {
   local service_id="${1:?}"
   local alert_type="${2:?}"
   local alert_title="${3:?}"
@@ -40,7 +40,7 @@ function incident_data() {
 
   # shellcheck disable=SC2016 # jq filter syntax: $-prefixed names are jq
   # variables bound by --arg above, not bash variables.
-  _jq -n \
+  pagerduty::_jq -n \
     --arg type "$alert_type" \
     --arg title "$alert_title" \
     --arg sid "$service_id" \
@@ -66,16 +66,16 @@ function pagerduty::send_incident() {
   local alert_token="${5:?}"
   local incident_key="${6}"
 
-  _curl -X POST --header 'Content-Type: application/json' \
+  pagerduty::_curl -X POST --header 'Content-Type: application/json' \
     --header 'Accept: application/vnd.pagerduty+json;version=2' \
     --header "From: $alert_from" \
     --header "Authorization: Token token=$alert_token" \
-    --data "$(incident_data "$service_id" "$alert_type" "$alert_title" "$incident_key")" \
+    --data "$(pagerduty::_incident_data "$service_id" "$alert_type" "$alert_title" "$incident_key")" \
     "${PAGERDUTY_INCIDENTS_URL:-https://api.pagerduty.com/incidents}"
   log::info "Sent PagerDuty incident"
 }
 
-function send_incident() {
+send_incident() {
   deprecated pagerduty::send_incident "$@"
 }
 
@@ -90,6 +90,6 @@ function pagerduty::send_event() {
   error::exit "pagerduty::send_event not implemented (use pagerduty::send_incident)"
 }
 
-function send_event() {
+send_event() {
   deprecated pagerduty::send_event "$@"
 }

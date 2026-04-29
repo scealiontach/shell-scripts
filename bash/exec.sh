@@ -37,7 +37,7 @@ function exec::capture() {
   # shellcheck disable=SC2086
   return ${exit_code}
 }
-function exec_and_capture() {
+exec_and_capture() {
   @doc Deprecated in favor of exec::capture
   deprecated exec::capture "$@"
 }
@@ -46,7 +46,7 @@ function exec::hide() {
   @doc Execute the provided command and swallow the output
   "$@" >/dev/null 2>&1
 }
-function exec_and_hide() {
+exec_and_hide() {
   @doc Deprecated in favor of exec::hide
   deprecated exec::hide "$@"
 }

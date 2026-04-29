@@ -5,9 +5,9 @@
 # `[ -lt ]` rejected as "integer expression expected", forcing the cache
 # branch to be skipped and triggering a fresh AWS ECR scan on every call.
 #
-# We exercise aws::refresh_scan in isolation by stubbing _describe_findings
-# (the only ECR-touching dependency that gates the comparison) and
-# aws::is_scan_complete, then asserting:
+# We exercise aws::refresh_scan in isolation by stubbing
+# aws::_describe_findings (the only ECR-touching dependency that gates the
+# comparison) and aws::is_scan_complete, then asserting:
 #   - a recently-completed (float-timestamp) scan SHORT-CIRCUITS to "within
 #     N days" and never invokes aws::scan_image (i.e. no rescan).
 #   - an old scan invokes aws::scan_image (rescan).
@@ -28,7 +28,7 @@ source "$REPO_ROOT/bash/aws.sh"
 
 # --- Stub the ECR boundary -------------------------------------------------
 
-# Mutable per-fixture: the JSON body _describe_findings will return.
+# Mutable per-fixture: the JSON body aws::_describe_findings will return.
 STUB_FINDINGS_JSON=""
 # Counter file: aws::scan_image runs in a subshell when refresh_scan is
 # invoked under $(...), so a plain variable wouldn't survive. The stub
@@ -39,7 +39,7 @@ trap 'rm -f "$SCAN_IMAGE_MARKER"' EXIT
 reset_marker() { : >"$SCAN_IMAGE_MARKER"; }
 scan_image_calls() { wc -c <"$SCAN_IMAGE_MARKER" | tr -d ' '; }
 
-_describe_findings() {
+aws::_describe_findings() {
   echo "$STUB_FINDINGS_JSON"
 }
 aws::is_scan_complete() {
@@ -88,11 +88,11 @@ case "$err" in
     ;;
 esac
 
-# --- Fixture 3: list_findings uses _jq, not bare jq ------------------------
+# --- Fixture 3: list_findings uses aws::_jq, not bare jq -------------------
 
-# Smoke: aws::list_findings must hand off through _describe_findings (stubbed
-# above to echo STUB_FINDINGS_JSON). With a synthetic findings doc, the
-# function should produce one row per finding without error. The pre-fix
+# Smoke: aws::list_findings must hand off through aws::_describe_findings
+# (stubbed above to echo STUB_FINDINGS_JSON). With a synthetic findings doc,
+# the function should produce one row per finding without error. The pre-fix
 # bare `jq` call would have bypassed commands::use jq's missing-jq guard;
 # this assertion gives the pipe a real exercise.
 STUB_FINDINGS_JSON='{

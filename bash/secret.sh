@@ -151,14 +151,6 @@ function secret::_env_as_file {
   echo "$tmpFile"
 }
 
-function _file_as_file {
-  deprecated secret::_file_as_file "$@"
-}
-
-function _env_as_file {
-  deprecated secret::_env_as_file "$@"
-}
-
 function secret::clear {
   @doc Clear secret temporary files.
   if [ -n "${SECRET_TMPFILES[0]}" ]; then

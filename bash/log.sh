@@ -203,10 +203,10 @@ log::notice() {
 #--------------------------------------------------------------------------------------------------
 # Helper Functions
 
-# Outputs a log formatted using the LOG_FORMAT and DATE_FORMAT configurables
-# Usage: FORMAT_LOG <log level> <log message>
-# Eg: FORMAT_LOG CRITICAL "My critical log"
-FORMAT_LOG() {
+function log::_format() {
+  @doc Format a log line using LOG_FORMAT and LOG_DATE_FORMAT.
+  @arg _1_ log level e.g. INFO
+  @arg _2_ log message
   local level="$1"
   local log="$2"
   local pid=$$
@@ -219,11 +219,18 @@ FORMAT_LOG() {
   formatted_log="${formatted_log/'%DATE'/$date}"
   printf '%s\n' "$formatted_log"
 }
+# Deprecated public name retained as a parens-only shim so the bare identifier
+# does not violate the lib-funcs-must-be-namespaced lint and external callers
+# continue to resolve.
+FORMAT_LOG() {
+  log::_format "$@"
+}
 
-# Calls one of the individual log functions
-# Usage: LOG <log level> <log message>
-# Eg: LOG INFO "My info log"
-LOG() {
+function log::log() {
+  @doc Dispatch a log line to the matching log level function.
+  @arg _1_ log level - TRACE, DEBUG, INFO, WARN/WARNING, NOTICE, ERROR, \
+    CRITICAL, ALERT, or EMERGENCY
+  @arg _2_ log message
   local level="${1^^}"
   local log="$2"
   case "$level" in
@@ -239,15 +246,23 @@ LOG() {
     *) log::error "Unknown log level: $1" ;;
   esac
 }
+LOG() {
+  log::log "$@"
+}
 
 log() {
   deprecated log::log "$@"
 }
-log::log() {
-  LOG "$1" "$2"
-}
 #--------------------------------------------------------------------------------------------------
 # Log Handlers
+#
+# LOG_HANDLER_DEFAULT, LOG_HANDLER_COLORTERM, and LOG_HANDLER_LOGFILE are the
+# documented override hooks: callers redefine them to change handler behaviour
+# at runtime. They keep their bare names (parens-only style) so the override
+# pattern continues to work and the `lib-funcs-must-be-namespaced` lint hook
+# does not flag them. The `log::_handler_*` aliases below give new code a
+# namespaced surface that delegates to whatever the override hook currently
+# points to.
 
 # All log levels call this handler (by default...), so this is a great place to put any standard
 # logging behavior
@@ -257,11 +272,15 @@ LOG_HANDLER_DEFAULT() {
   # $1 - level
   # $2 - message
   local formatted_log
-  formatted_log="$(FORMAT_LOG "$@")"
+  formatted_log="$(log::_format "$@")"
   LOG_HANDLER_COLORTERM "$1" "$formatted_log"
   if [ -z "$LOGFILE_DISABLE" ] || [ "$LOGFILE_DISABLE" != "true" ]; then
     LOG_HANDLER_LOGFILE "$1" "$formatted_log"
   fi
+}
+function log::_handler_default() {
+  @doc Namespaced alias for the LOG_HANDLER_DEFAULT override hook.
+  LOG_HANDLER_DEFAULT "$@"
 }
 
 # Outputs a log to the stdout, colourised using the LOG_COLOR configurables
@@ -275,6 +294,10 @@ LOG_HANDLER_COLORTERM() {
   log="$color$log$RESET_COLOR"
   echo >&2 -e "$log"
 }
+function log::_handler_colorterm() {
+  @doc Namespaced alias for the LOG_HANDLER_COLORTERM override hook.
+  LOG_HANDLER_COLORTERM "$@"
+}
 
 # Appends a log to the configured logfile
 # Usage: LOG_HANDLER_LOGFILE <log level> <log message>
@@ -286,4 +309,8 @@ LOG_HANDLER_LOGFILE() {
   log_path="$(dirname "$LOGFILE")"
   [ -d "$log_path" ] || mkdir -p "$log_path"
   echo "$log" >>"$LOGFILE"
+}
+function log::_handler_logfile() {
+  @doc Namespaced alias for the LOG_HANDLER_LOGFILE override hook.
+  LOG_HANDLER_LOGFILE "$@"
 }

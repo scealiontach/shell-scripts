@@ -25,7 +25,7 @@ function aws::cmd {
   $(commands::use aws) --output json "$@"
 }
 
-function _jq {
+function aws::_jq {
   $(commands::use jq) "$@"
 }
 
@@ -34,14 +34,14 @@ function aws::ecr {
 }
 
 function aws::get_repositories {
-  aws::ecr describe-repositories | _jq -r '.repositories[].repositoryName' |
+  aws::ecr describe-repositories | aws::_jq -r '.repositories[].repositoryName' |
     sort
 }
 
 function aws::get_tags {
   local repository=${1:?}
   aws::ecr list-images "--repository-name=$repository" |
-    _jq -r '.imageIds[].imageTag' | sort
+    aws::_jq -r '.imageIds[].imageTag' | sort
 }
 
 function aws::scan {
@@ -80,19 +80,19 @@ function aws::scan_image {
     return 0
   elif [ "$status" = "FAILED" ]; then
     local description
-    description=$(_describe_findings "$repository" "$tag" |
-      _jq -r '.imageScanStatus.description')
+    description=$(aws::_describe_findings "$repository" "$tag" |
+      aws::_jq -r '.imageScanStatus.description')
     log::warn "Scan of $repository:$tag $description"
     return 1
   fi
   log::info "Scanning of $repository:$tag"
   status=$(aws::ecr start-image-scan "--repository-name=$repository" \
     --image-id imageTag="$tag" |
-    _jq -r '.imageScanStatus.status')
+    aws::_jq -r '.imageScanStatus.status')
   log::info "Scan of $repository:$tag is now $status"
 }
 
-function _describe_findings {
+function aws::_describe_findings {
   local repository=${1:?}
   local tag=${2:?}
   aws::ecr describe-image-scan-findings "--repository-name=$repository" \
@@ -102,8 +102,8 @@ function _describe_findings {
 function aws::scan_status {
   local repository=${1:?}
   local tag=${2:?}
-  _describe_findings "$repository" "$tag" |
-    _jq -r '.imageScanStatus.status'
+  aws::_describe_findings "$repository" "$tag" |
+    aws::_jq -r '.imageScanStatus.status'
 }
 
 function aws::is_scan_complete {
@@ -131,8 +131,8 @@ function aws::list_findings {
   local repository=${1:?}
   local tag=${2:?}
   # shellcheck disable=SC2016 # jq filter syntax: dollar names below are jq.
-  _describe_findings "$repository" "$tag" |
-    _jq -r '.imageScanFindings.findings[] |
+  aws::_describe_findings "$repository" "$tag" |
+    aws::_jq -r '.imageScanFindings.findings[] |
       (.severity + " " + .name + " " + .uri)'
 }
 
@@ -152,8 +152,8 @@ function aws::refresh_scan {
     # POSIX `[ -lt ]` is integer-only, so the prior bare comparison
     # spuriously failed and the cache was defeated. `floor` (jq >= 1.5)
     # truncates to an integer for the comparison below.
-    completedAt=$(_describe_findings "$repository" "$tag" |
-      _jq -r '.imageScanFindings.imageScanCompletedAt | floor')
+    completedAt=$(aws::_describe_findings "$repository" "$tag" |
+      aws::_jq -r '.imageScanFindings.imageScanCompletedAt | floor')
     if [ "$earliest" -lt "$completedAt" ]; then
       log::info "Scan of $repository:$tag was done within $days_ago days"
       return
