@@ -146,6 +146,7 @@ function ::ensure_asdf {
 function ::asdf {
   local plugin=${1:?}
   local version=${2:-latest}
+  local _asdf _where ret
   _asdf=$(command -v asdf)
   if _where=$($_asdf which "$plugin"); then
     log::info "Using $_where"
@@ -199,6 +200,7 @@ function ::add_namespaces {
 }
 
 function ::add_helm_repos {
+  local repo repo_name repo_url
   for repo in "${ADD_HELM_REPOS[@]}"; do
     repo_name=$(echo "$repo" | awk -F, '{print $1}')
     repo_url=$(echo "$repo" | awk -F, '{print $2}')
@@ -237,6 +239,10 @@ function delete {
   ::delete_dind
   # set +e
 }
+
+# Test seam: when sourced from bats, skip the main entry point so
+# individual functions can be exercised in isolation.
+[ "${KIND_TEST_ENVIRONMENT_SOURCE_ONLY:-}" = "true" ] && return 0
 
 case "$COMMAND" in
   create | delete) "$COMMAND" ;;
