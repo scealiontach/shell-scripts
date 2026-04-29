@@ -68,6 +68,7 @@ EOF
 function getItems() {
   local ns=$1
   local itemType=$2
+  local selector
   if [ "$itemType" = "rs" ]; then
     getRs "$ns" "${3:-}"
   else
@@ -82,6 +83,7 @@ function getItems() {
 
 function getRs() {
   local ns=$1
+  local selector
   if [ -n "$2" ]; then
     selector=(-l "$2")
   else
@@ -101,13 +103,14 @@ function getChildren() {
   local pumlTypeParent=$5
   local pumlTypeChild=$6
   local extra=$7
-  select=$(k8s::ctl describe -n "$ns" \
+  local selector_text child clean_child
+  selector_text=$(k8s::ctl describe -n "$ns" \
     "$parentType" "$res" | grep "^Selector:" | awk '{print $NF}')
-  echo \'"$ns" "$parentType" "$res" Selector "$childType" "$select"
-  if [ "$select" = '<none>' ]; then
+  echo \'"$ns" "$parentType" "$res" Selector "$childType" "$selector_text"
+  if [ "$selector_text" = '<none>' ]; then
     return
   fi
-  for child in $(getItems "$ns" "$childType" "$select"); do
+  for child in $(getItems "$ns" "$childType" "$selector_text"); do
     clean_child=${child//-/_}
     echo "Rel${extra}(${pumlTypeParent}_${clean_ns}_${clean_res},${pumlTypeChild}_${clean_ns}_${clean_child},\"\")"
   done
@@ -210,4 +213,7 @@ EOF
   echo @enduml
 }
 
+# Test seam: when sourced from bats, skip the main entry point so
+# individual functions can be exercised in isolation.
+[ "${PLANTUML_FROM_K8S_SOURCE_ONLY:-}" = "true" ] && return 0
 cluster "$CLUSTER"
