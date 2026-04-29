@@ -147,6 +147,7 @@ function correct_export {
 
 function build {
   local dir=${1:?}
+  local ret
 
   verifyExport "$dir"
   ret=$?
@@ -169,7 +170,11 @@ STOP_INT=$(hex_to_dec "$STOP_OFFSET")
 
 count=0
 RUNNING_PROCS=()
-TO_BUILD=()
+# TO_BUILD removed (SUR-1871): the previous queue accumulated every
+# OUTPUT_DIR but only drained one entry per iteration, so the post-loop
+# `find ... export.good` walk below already had to pick up the rest.
+# Building OUTPUT_DIR directly in-loop and letting the post-loop walk
+# catch up is the simpler, equivalent path.
 
 # Kill any background `daml build` jobs we still know about on script
 # exit or Ctrl-C so they don't keep running after the user gives up.
@@ -185,12 +190,23 @@ function kill_running_procs {
 }
 trap kill_running_procs EXIT INT TERM
 
-while [ "$CUR_INT" -le "$STOP_INT" ] && [ "$CUR_INT" != "$NEXT_INT" ]; do
+# Loop guard rewrite (SUR-1871): the original
+#   while [ "$CUR_INT" -le "$STOP_INT" ] && [ "$CUR_INT" != "$NEXT_INT" ]
+# only worked on the first iteration because NEXT_INT was unset-as-empty,
+# so a future `set -u` migration would break it. The explicit
+# no-progress sentinel below replaces that brittle test.
+while [ "$CUR_INT" -le "$STOP_INT" ]; do
+  prev=$CUR_INT
 
   NEXT_INT=$((CUR_INT + "$STEPPING"))
   if [ $NEXT_INT -gt "$STOP_INT" ]; then
     NEXT_INT=$STOP_INT
   fi
+
+  # No-progress sentinel: when CUR_INT was already at STOP_INT, NEXT_INT
+  # gets capped to the same value, producing an empty range. Skip the
+  # body and exit before creating a stray empty-range artifact.
+  [ "$CUR_INT" -eq "$NEXT_INT" ] && break
 
   CUR_HEX=$(dec_to_hex "$CUR_INT")
   NEXT_HEX=$(dec_to_hex "$NEXT_INT")
@@ -203,7 +219,6 @@ while [ "$CUR_INT" -le "$STOP_INT" ] && [ "$CUR_INT" != "$NEXT_INT" ]; do
     exportRange "$CUR_HEX" "$NEXT_HEX" "$OUTPUT_DIR" "$BASE_DIR"
   fi
 
-  TO_BUILD+=("$OUTPUT_DIR")
   CURRENT_PROCS=()
   for pid in "${RUNNING_PROCS[@]}"; do
     if ps -p "$pid" >/dev/null; then
@@ -213,16 +228,17 @@ while [ "$CUR_INT" -le "$STOP_INT" ] && [ "$CUR_INT" != "$NEXT_INT" ]; do
   done
 
   if [ "${#RUNNING_PROCS[@]}" -lt "$MAX_PARALLEL" ]; then
-    this_dir="${TO_BUILD[0]}"
-    TO_BUILD=("${TO_BUILD[@]:1}")
-    correct_export "$this_dir"
-    build "$this_dir" &
+    correct_export "$OUTPUT_DIR"
+    build "$OUTPUT_DIR" &
     RUNNING_PROCS+=($!)
     echo "Daml builds ${RUNNING_PROCS[*]} in the background"
   fi
 
   CUR_INT=$NEXT_INT
   ((count += 1))
+  # Belt-and-suspenders: also guard against zero-progress in the
+  # increment so the loop cannot wedge if STEPPING ever reaches 0.
+  [ "$CUR_INT" -eq "$prev" ] && break
 done
 
 find "$TARGET_DIR" -name export.good -print | sort | while read -r buildFile; do
