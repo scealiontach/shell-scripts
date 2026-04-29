@@ -164,9 +164,17 @@ for hex_pair in \
   fi
 done
 
-# Behavioral check (SUR-1883): all three builds should have completed,
-# confirming that verify_and_build was called and RUNNING_PROCS was populated
-# (process substitution keeps the mutations in the parent shell).
+# Behavioral check (SUR-1883 DoD: RUNNING_PROCS populated after post-loop walk).
+#
+# Direct inspection of RUNNING_PROCS from outside the script subprocess is not
+# feasible — the array lives in the script's own shell and is not exported.
+# Instead we verify the dar output files that the background 'daml build'
+# processes (tracked via RUNNING_PROCS) are responsible for producing.  If
+# process substitution is absent (pipe subshell used instead), RUNNING_PROCS
+# mutations are lost in the parent and the kill_running_procs trap silently
+# fires on zero pids; builds may still complete due to background &, but the
+# parent loses awareness of them.  The static check above (< <(...)) catches
+# the structural regression; this check verifies the builds actually ran.
 for hex_pair in \
   "0000000000000000-00000000000001f4" \
   "00000000000001f4-00000000000003e8" \

@@ -4,7 +4,9 @@
 # rebuilds stale tarballs.
 #
 # Test strategy:
-#   1. make clean && make package — capture baseline tarball checksums.
+#   1. rm -rf dist && make package — capture baseline tarball checksums.
+#      ('make clean' is intentionally avoided to preserve markers/ and build/
+#      directories that CI needs for subsequent 'make archive'.)
 #   2. Touch a bash/*.sh source file (updating mtime).
 #   3. make package (no clean) — assert at least one tarball was regenerated
 #      (its checksum changed relative to baseline).
@@ -15,6 +17,9 @@ REPO_ROOT="$(cd -P "$TEST_DIR/.." && pwd)"
 source "$TEST_DIR/lib/assert.sh"
 
 failures=0
+
+# sha256sum is Linux-specific; macOS ships shasum -a 256.
+checksum() { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; }
 
 # Confirm prerequisites are declared in Makefile (static check).
 if ! grep -q 'DOC_SRC' "$REPO_ROOT/Makefile"; then
@@ -42,29 +47,31 @@ if ! grep -q '\.PHONY:.*\.zip\|\.PHONY:.*\.tgz' "$REPO_ROOT/standard_defs.mk"; t
 fi
 
 # Incremental build correctness (functional check).
-# Run in a temp dir clone so we don't pollute the working tree's dist/.
+# We work directly in REPO_ROOT to keep VERSION/git state intact.
+# Only dist/ is touched — we deliberately avoid 'make clean' here because
+# that would delete markers/ and build/ (via clean_dirs_standard), breaking
+# any subsequent 'make archive' call in CI after this test completes.
 tmp_root=$(mktemp -d)
 trap 'rm -rf "$tmp_root"' EXIT
 
-# We work directly in REPO_ROOT to keep VERSION/git state intact.
-# Save and restore dist/ around the test.
 dist_backup="$tmp_root/dist_backup"
 if [ -d "$REPO_ROOT/dist" ]; then
   cp -a "$REPO_ROOT/dist" "$dist_backup"
 fi
 
-# Clean slate then first package build.
-(cd "$REPO_ROOT" && make clean >/dev/null 2>&1 && make package >/dev/null 2>&1)
+# Remove only dist/ then do the first package build.
+rm -rf "$REPO_ROOT/dist"
+(cd "$REPO_ROOT" && make package >/dev/null 2>&1)
 build_rc=$?
 if [ $build_rc -ne 0 ]; then
-  echo "FAIL: 'make clean && make package' exited rc=$build_rc" >&2
+  echo "FAIL: 'make package' (fresh dist) exited rc=$build_rc" >&2
   failures=$((failures + 1))
 else
   # Record checksums of all produced tarballs.
   declare -A before_sums
   for f in "$REPO_ROOT"/dist/*.tar.gz; do
     [ -f "$f" ] || continue
-    before_sums["$(basename "$f")"]=$(sha256sum "$f" | awk '{print $1}')
+    before_sums["$(basename "$f")"]=$(checksum "$f" | awk '{print $1}')
   done
 
   if [ "${#before_sums[@]}" -eq 0 ]; then
@@ -85,7 +92,7 @@ else
       for f in "$REPO_ROOT"/dist/*.tar.gz; do
         [ -f "$f" ] || continue
         name=$(basename "$f")
-        after_sum=$(sha256sum "$f" | awk '{print $1}')
+        after_sum=$(checksum "$f" | awk '{print $1}')
         if [ "${before_sums[$name]}" != "$after_sum" ]; then
           changed=$((changed + 1))
         fi
@@ -98,8 +105,8 @@ else
   fi
 fi
 
-# Restore dist/ if it existed before the test.
-(cd "$REPO_ROOT" && make clean >/dev/null 2>&1)
+# Restore dist/ to pre-test state (remove only, no make clean).
+rm -rf "$REPO_ROOT/dist"
 if [ -d "$dist_backup" ]; then
   cp -a "$dist_backup" "$REPO_ROOT/dist"
 fi

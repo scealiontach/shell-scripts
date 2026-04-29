@@ -40,16 +40,10 @@ function git::tagsinhistory() {
 function git::commit_url_base() {
   @doc Return the commit-URL prefix: https://github.com/owner/repo/commit
   @doc Emits empty string for non-GitHub remotes.
-  local origin_url
-  origin_url=$(git remote -v | grep "^origin" | head -1)
-  if echo "$origin_url" | grep -q github; then
-    local slug
-    slug=$(echo "$origin_url" | awk '{print $2}')
-    slug=${slug//.git/}
-    slug=${slug//git@github.com:/}
-    slug=${slug//https:\/\/github.com\//}
-    slug=${slug//http:\/\/github.com\//}
-    echo "https://github.com/$slug/commit"
+  local base
+  base=$(git::project_url)
+  if [[ -n "$base" ]]; then
+    echo "$base/commit"
   fi
 }
 
