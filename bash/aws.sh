@@ -18,6 +18,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 @include commands
+@include log
 
 @package aws
 
