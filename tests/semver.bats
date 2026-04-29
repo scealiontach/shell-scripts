@@ -111,6 +111,14 @@ setup() {
   [ "$output" = "-1" ]
 }
 
+# ---------- help ------------------------------------------------------------
+
+@test "--help USAGE block lists the diff subcommand (SUR-1878)" {
+  run "$SEMVER" --help
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -E '^[[:space:]]*semver diff <version> <other_version>'
+}
+
 # ---------- diff ------------------------------------------------------------
 
 @test "diff major: 1.0.0 vs 2.0.0 -> major" {
