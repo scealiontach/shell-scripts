@@ -35,11 +35,12 @@ if ! grep -q "wait_for_change" "$fn_src"; then
 fi
 
 # Stub the helpers wait_for_change calls so we don't pull in the full
-# logging stack. shellcheck cannot see that the extracted function
-# below references these, so silence SC2329.
-# shellcheck disable=SC2329
+# logging stack. shellcheck cannot see that the extracted function below
+# references these, so silence SC2329 (function never invoked) and
+# SC2317 (commands in the stub bodies appear unreachable).
+# shellcheck disable=SC2317,SC2329
 log::trace() { :; }
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 error::exit() {
   echo "error::exit: $*" >&2
   return 1
