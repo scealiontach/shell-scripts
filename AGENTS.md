@@ -29,9 +29,13 @@ bash/bashadoc bash/<lib>.sh               # generate markdown docs for one libra
 bash/pack-script -f <command> -o <out>    # inline @include deps -> standalone
 ```
 
-CI (`.github/workflows/pre-commit.yaml`) only runs pre-commit hooks; Jenkins runs
-`make clean build`, `make package`, `make analyze`, `make test`, `make archive`,
-and on `main` `make publish`.
+CI is split across two GitHub Actions workflows:
+`.github/workflows/pre-commit.yaml` runs the pre-commit hooks, and
+`.github/workflows/ci.yaml` runs `make clean build`, `make package`,
+`make analyze` (gated on the `FOSSA_API_KEY` secret), `make test`, and
+`make archive`. A separate `publish` job in `ci.yaml` runs
+`make clean publish` only on pushes to `main` or to a tag, using the
+workflow's `GITHUB_TOKEN`.
 
 ## Testing
 
