@@ -67,12 +67,21 @@ function update_eksctl {
   fi
   # Verify SHA-256: extract the hash for our tarball and check against the download.
   local expected_hash
-  expected_hash=$(grep "[[:space:]]${tarball}$" "$tmpdir/eksctl_checksums.txt" | awk '{print $1}')
+  expected_hash=$(grep -F " ${tarball}" "$tmpdir/eksctl_checksums.txt" | awk '{print $1}')
   if [ -z "$expected_hash" ]; then
     echo "update_eksctl: ${tarball} not found in checksums file" >&2
     return 1
   fi
-  if ! echo "${expected_hash}  $tmpdir/${tarball}" | sha256sum --check --status; then
+  local -a sha_cmd
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha_cmd=(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then
+    sha_cmd=(shasum -a 256)
+  else
+    echo "update_eksctl: no sha256 tool found (install coreutils or shasum)" >&2
+    return 1
+  fi
+  if ! echo "${expected_hash}  $tmpdir/${tarball}" | "${sha_cmd[@]}" --check --status; then
     echo "update_eksctl: SHA-256 verification failed" >&2
     return 1
   fi
@@ -170,7 +179,16 @@ function update_kubectl {
   # kubectl.sha256 contains only the hash (no filename); construct the check input.
   local expected_hash
   expected_hash=$(cat "$tmpdir/kubectl.sha256")
-  if ! echo "${expected_hash}  $tmpdir/kubectl" | sha256sum --check --status; then
+  local -a sha_cmd
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha_cmd=(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then
+    sha_cmd=(shasum -a 256)
+  else
+    echo "update_kubectl: no sha256 tool found (install coreutils or shasum)" >&2
+    return 1
+  fi
+  if ! echo "${expected_hash}  $tmpdir/kubectl" | "${sha_cmd[@]}" --check --status; then
     echo "update_kubectl: SHA-256 verification failed" >&2
     return 1
   fi

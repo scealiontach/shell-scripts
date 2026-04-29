@@ -69,5 +69,5 @@ setup() {
   # The rewrite must use 'install -m 0755' instead.
   run awk '/^function update_kubectl/,/^}$/' "$ALIASES"
   [ "$status" -eq 0 ]
-  [[ "$output" =~ install ]]
+  [[ "$output" =~ "install -m 0755" ]]
 }

@@ -41,22 +41,20 @@ found=0
 
 for file in "$@"; do
   in_function=0
-  declare -A locals=()
+  locals=""
 
   while IFS= read -r line; do
     # Detect function entry.
     if [[ "$line" =~ $FUNC_DEF_PAT ]]; then
       in_function=1
-      unset locals
-      declare -A locals=()
+      locals=""
       continue
     fi
 
     # Detect function end: a lone `}` (possibly indented) on its own line.
     if [[ "$line" =~ ^[[:space:]]*[}][[:space:]]*$ ]] && [ "$in_function" -eq 1 ]; then
       in_function=0
-      unset locals
-      declare -A locals=()
+      locals=""
       continue
     fi
 
@@ -68,7 +66,7 @@ for file in "$@"; do
         # Match `local varname`, `local varname=...`, or `local a varname b`.
         if [[ "$line" =~ (^|[[:space:]])local([[:space:]]+-[a-zA-Z])*[[:space:]]${varname}([[:space:]]|=|$) ]] ||
           [[ "$line" =~ (^|[[:space:]])local([[:space:]]+-[a-zA-Z])*[[:space:]].*[[:space:]]${varname}([[:space:]]|=|$) ]]; then
-          locals[$varname]=1
+          locals="$locals $varname "
         fi
       done
       continue
@@ -77,14 +75,13 @@ for file in "$@"; do
     # Check for a bare capture on this line.
     if [[ "$line" =~ $CAPTURE_PAT ]]; then
       varname="${BASH_REMATCH[1]}"
-      if [ -z "${locals[$varname]+set}" ]; then
+      if [[ " $locals " != *" $varname "* ]]; then
         echo "$file: bare capture (add 'local $varname'): $line" >&2
         found=1
       fi
     fi
   done <"$file"
 
-  unset locals
 done
 
 if [ "$found" -ne 0 ]; then
