@@ -106,6 +106,13 @@ if [ "$skip" = "false" ]; then
       if [ -r "CHANGELOG.md" ]; then
         "$(dirs::of)"/changelog -l | sed -e "s/Unreleased/$TAG/" >CHANGELOG.md
         git add CHANGELOG.md
+        # CI-only bypass: pre-commit hooks fail in non-interactive release contexts
+        # (markdownlint may flag mechanically regenerated CHANGELOG.md; the hook
+        # runner cannot reach the network for pre-commit binary installs in CI).
+        # The source commits that triggered this release already passed pre-commit
+        # on their own branches. This is a documented exception to the
+        # "never skip hooks" rule — see the "Hook bypass exceptions" section in
+        # AGENTS.md. (SUR-1879)
         git commit --no-verify -m "ci: Update CHANGELOG releasing $TAG" CHANGELOG.md
       else
         log::notice "No prior changelog found. Will not generate a new one."
