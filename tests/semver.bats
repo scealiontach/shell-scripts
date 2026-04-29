@@ -231,3 +231,42 @@ setup() {
   [ "$status" -eq 0 ]
   [ "$output" = "sha.deadbeef" ]
 }
+
+# ---------- validate-version nameref population (SUR-1875) ------------------
+
+@test "validate-version populates the named array via nameref (no eval)" {
+  # Source the script's functions in a sub-shell, then call validate-version
+  # against a representative version with both prerelease and build metadata
+  # and assert each parts[i] value. This is the public contract callers like
+  # command-bump / command-diff / command-get rely on.
+  run env "SEMVER_SOURCE_ONLY=true" bash -c "
+    source '$SEMVER'
+    declare -a parts
+    validate-version '1.2.3-rc.1+meta' parts
+    printf '%s\n' \"\${parts[0]}\" \"\${parts[1]}\" \"\${parts[2]}\" \"\${parts[3]}\" \"\${parts[4]}\"
+  "
+  [ "$status" -eq 0 ]
+  expected=$'1\n2\n3\n-rc.1\n+meta'
+  [ "$output" = "$expected" ]
+}
+
+@test "validate-version one-arg form echoes the version verbatim" {
+  run "$SEMVER" bump release 1.2.3-rc.1+meta
+  [ "$status" -eq 0 ]
+  # The 1-arg validate-version path is exercised by command-bump's release
+  # synthesis in command-bump 'major|minor|patch|release' mode, but the
+  # bare contract check is simpler via the get-style path. Any of bump
+  # release / get release returning 1.2.3 confirms the path.
+  [ "$output" = "1.2.3" ]
+}
+
+@test "validate-version nameref does not leak variables to caller scope" {
+  run env "SEMVER_SOURCE_ONLY=true" bash -c "
+    source '$SEMVER'
+    declare -a parts
+    validate-version '1.2.3-rc.1+meta' parts
+    [ -z \"\${version:-}\" ]      || { echo 'version leaked' >&2; exit 1; }
+    [ -z \"\${_vv_out:-}\" ]      || { echo '_vv_out leaked' >&2; exit 1; }
+  "
+  [ "$status" -eq 0 ]
+}

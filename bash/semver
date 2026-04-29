@@ -88,12 +88,18 @@ function validate-version() {
   if [[ "$version" =~ $SEMVER_REGEX ]]; then
     # if a second argument is passed, store the result in var named by $2
     if [ "$#" -eq "2" ]; then
-      local major=${BASH_REMATCH[1]}
-      local minor=${BASH_REMATCH[2]}
-      local patch=${BASH_REMATCH[3]}
-      local prere=${BASH_REMATCH[4]}
-      local build=${BASH_REMATCH[8]}
-      eval "$2=(\"$major\" \"$minor\" \"$patch\" \"$prere\" \"$build\")"
+      # Bash 4.3+ nameref: assign the parts array directly into the
+      # caller-named variable, avoiding eval. Pick a non-trivial nameref
+      # name so callers can use natural names like `parts`, `V`, `V_`,
+      # `v1_parts`, `v2_parts` without triggering a circular reference.
+      local -n _vv_out=$2
+      _vv_out=(
+        "${BASH_REMATCH[1]}"
+        "${BASH_REMATCH[2]}"
+        "${BASH_REMATCH[3]}"
+        "${BASH_REMATCH[4]}"
+        "${BASH_REMATCH[8]}"
+      )
     else
       echo "$version"
     fi
@@ -356,6 +362,11 @@ function command-get() {
 
   exit 0
 }
+
+# Test seam: when sourced from bats, skip the main entry point so
+# individual functions (e.g. validate-version) can be exercised in
+# isolation without triggering the no-args usage-help error.
+[ "${SEMVER_SOURCE_ONLY:-}" = "true" ] && return 0
 
 case $# in
   0)
