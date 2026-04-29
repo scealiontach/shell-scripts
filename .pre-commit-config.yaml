@@ -78,3 +78,15 @@ repos:
         args:
           - "--tap"
           - "tests"
+      - id: lib-funcs-must-be-namespaced
+        name: lib-funcs-must-be-namespaced
+        # AGENTS.md mandates that every function in a bash/*.sh library use
+        # `package::name` qualification. Bare `function foo` definitions
+        # leak globals, defeat bashadoc (which filters by `^$package::`),
+        # and create cross-library collision risk. Backward-compat shims
+        # are still allowed via the parens-only `foo() { ... }` form,
+        # which this hook does not flag.
+        entry: bash tests/check-lib-namespaces.sh
+        language: system
+        files: ^bash/[^/]+\.sh$
+        pass_filenames: true

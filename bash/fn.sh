@@ -33,7 +33,7 @@ function fn::if_exists() {
     $func "$@"
   fi
 }
-function fn_if_exists() {
+fn_if_exists() {
   @doc "Deprecated in favor of fn::if_exists"
   deprecated fn::if_exists "$@"
 }
@@ -51,7 +51,7 @@ function fn::wrapped() {
     "$@"
   fi
 }
-function fn_wrapped() {
+fn_wrapped() {
   @doc Deprecated in favor of fn::wrapped
   deprecated fn::wrapped "$@"
 }

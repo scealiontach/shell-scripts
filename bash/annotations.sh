@@ -28,6 +28,6 @@ function annotations::deprecated() {
   log::debug "${FUNCNAME[1]} is deprecated. Replace with $newfunc"
   "$@"
 }
-function deprecated() {
+deprecated() {
   annotations::deprecated "$@"
 }

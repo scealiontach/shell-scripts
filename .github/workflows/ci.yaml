@@ -1,0 +1,131 @@
+---
+# Copyright © 2023 Kevin T. O'Donnell
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ----------------------------------------------------------------------------
+#
+# SUR-1853: replaces the legacy Jenkinsfile (Fetch Tags / Build / Package /
+# Analyze / Test / Create Archive / Publish). The pre-commit hooks live in
+# .github/workflows/pre-commit.yaml and are intentionally not duplicated
+# here.
+name: ci
+
+# yamllint disable-line rule:truthy
+on:
+  push:
+    branches: ["main"]
+    tags: ["*"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  build:
+    name: build / test / package / archive
+    runs-on: ubuntu-latest
+    # Lift FOSSA_API_KEY to job scope so both the gated Analyze step and
+    # its companion "skipped" step read the same value via env.* without
+    # duplicating the `${{ secrets.FOSSA_API_KEY }}` expansion at every
+    # step that needs to introspect its presence.
+    env:
+      FOSSA_API_KEY: ${{ secrets.FOSSA_API_KEY }}
+    steps:
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          # `make what_version` derives VERSION from `git describe`, so we
+          # need the full history and every tag. submodules: recursive
+          # mirrors the pre-commit workflow because the bats submodule is
+          # required by `make test_bats`.
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: recursive
+
+      - name: Show derived version
+        run: make what_version
+
+      - name: Build
+        run: make clean build
+
+      - name: Package
+        run: make package
+
+      # Jenkins' Analyze stage ran `make analyze` with FOSSA_API_KEY injected
+      # by Jenkins credentials. `make analyze` is currently a no-op in this
+      # repo (see standard_defs.mk), but we keep the stage wired up and
+      # gated on the FOSSA_API_KEY repository secret so PRs from forks (and
+      # any environment without the secret) skip it cleanly.
+      - name: Analyze (FOSSA, gated)
+        if: ${{ env.FOSSA_API_KEY != '' }}
+        run: make analyze
+
+      - name: Analyze (skipped — no FOSSA secret)
+        if: ${{ env.FOSSA_API_KEY == '' }}
+        run: echo "FOSSA_API_KEY not set; skipping make analyze."
+
+      - name: Test
+        run: make test
+
+      - name: Archive
+        run: make archive
+
+      - name: Upload build artifacts
+        # archiveArtifacts in Jenkins took build/*.tgz and build/*.zip;
+        # mirror that here. `make package` populates dist/*.tar.gz —
+        # include it too so reviewers can grab the same payload that
+        # `make publish` would upload.
+        if: >-
+          ${{ github.event_name == 'pull_request' ||
+              (github.event_name == 'push' &&
+               github.ref != 'refs/heads/main' &&
+               !startsWith(github.ref, 'refs/tags/')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: shell-scripts-build-${{ github.sha }}
+          path: |
+            build/*.tgz
+            build/*.zip
+            dist/*.tar.gz
+          if-no-files-found: warn
+          retention-days: 14
+
+  publish:
+    name: publish (gh release upload)
+    # Only on main pushes or tag pushes — matches the Jenkinsfile's
+    # `when { expression { env.BRANCH_NAME == "main" } }` plus the
+    # standard tag-driven semantic that `make publish` honours via
+    # the RELEASABLE flag from standard_defs.mk.
+    if: >-
+      ${{ github.event_name == 'push' &&
+          (github.ref == 'refs/heads/main' ||
+           startsWith(github.ref, 'refs/tags/')) }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout (full history + tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          submodules: recursive
+
+      - name: Publish via gh release
+        env:
+          # `make publish` runs `gh release create/upload` inside the
+          # toolchain image. It only acts when standard_defs.mk's RELEASABLE
+          # flag is "yes" (i.e. exactly on a clean tagged commit), so a plain
+          # push to main without a new tag is a no-op — same semantics as the
+          # legacy Jenkins job.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: make clean publish

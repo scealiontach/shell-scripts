@@ -38,7 +38,7 @@ function k8s::exec() {
   shift 2
   k8s::ctl exec "$pod" -c "$container" "$@"
 }
-function kexec() {
+kexec() {
   @doc deprecated in favor k8s::exec
   deprecated k8s::exec "$@"
 }
@@ -47,7 +47,7 @@ function k8s::log() {
   @doc Get the logs
   k8s::ctl logs "$@"
 }
-function klog() {
+klog() {
   @doc "deprecated in favor of k8s::log"
   deprecated k8s::log "$@"
 }
@@ -56,7 +56,7 @@ function k8s::cp() {
   @doc Copy the named file to/from a k8s pod/container
   k8s::ctl cp "$@"
 }
-function kcp() {
+kcp() {
   @doc deprecated in favor of k8s::cp
   deprecated k8s::cp "$@"
 }
