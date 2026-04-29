@@ -17,6 +17,7 @@
 # shellcheck source=includer.sh
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
+@include commands
 @include k8s
 @include log
 @include options
@@ -28,9 +29,6 @@ options::add -o t -d "node to migrate to" -a -m -e TRGT_NODE
 options::add -o l -d "label of the sawtooth" -a -m -e LABEL
 options::parse "$@"
 
-declare -A node2pod
-declare -A pod2node
-
 function getPodsForLabel() {
   local label=${1:?}
   k8s::ctl get pods -l "$label" -o name | awk -F/ '{print $2}'
@@ -38,17 +36,25 @@ function getPodsForLabel() {
 
 function getNodeForPod() {
   local pod=${1:?}
-  k8s::ctl get "pod/${pod}" -o json | jq -r '.spec.nodeName'
+  k8s::ctl get "pod/${pod}" -o json | $(commands::use jq) -r '.spec.nodeName'
 }
 
+# Populate the two associative-array name-references with the
+# node↔pod mapping for the given label. The maps are passed by
+# nameref so callers (notably `main`) own their lifetime as locals
+# rather than this script's globals — see SUR-1872.
 function mapPods() {
   local _label=${1:?}
+  local -n _node2pod=${2:?}
+  local -n _pod2node=${3:?}
   log::info "mapping pods to nodes for label $_label"
+  local p node
   for p in $(getPodsForLabel "${_label:?}"); do
     node=$(getNodeForPod "${p}")
-    node2pod[$node]=$p
-    # shellcheck disable=SC2034
-    pod2node[$p]=$node
+    # shellcheck disable=SC2004 # associative-array index, not arithmetic
+    _node2pod[$node]=$p
+    # shellcheck disable=SC2004 # associative-array index, not arithmetic
+    _pod2node[$p]=$node
   done
 }
 
@@ -115,10 +121,15 @@ function waitForPodTermination() {
 
 function main() {
   set -euo pipefail
+  local -A node2pod=()
+  # mapPods writes to pod2node via nameref but the script does not read
+  # it; kept as part of mapPods's contract for diagnostic / future use.
+  # shellcheck disable=SC2034
+  local -A pod2node=()
   # shellcheck disable=SC2153
-  mapPods "$LABEL"
-  from_pod=${node2pod[$FROM_NODE]}
-  to_pod=${node2pod[$TRGT_NODE]}
+  mapPods "$LABEL" node2pod pod2node
+  local from_pod=${node2pod[$FROM_NODE]}
+  local to_pod=${node2pod[$TRGT_NODE]}
 
   getKeys "$from_pod"
   getKeys "$to_pod"

@@ -20,6 +20,7 @@ USAGE="\
 Usage:
   $PROG bump (major|minor|patch|release|prerel <prerel>|build <build>) <version>
   $PROG compare <version> <other_version>
+  $PROG diff <version> <other_version>
   $PROG get (major|minor|patch|release|prerel|build) <version>
   $PROG --help
   $PROG --version
@@ -47,7 +48,7 @@ Options:
   -v, --version          Print the version of this tool.
   -h, --help             Print this help message.
 
-Commands:
+Commands (bump, compare, diff, get):
   bump     Bump by one of major, minor, patch; zeroing or removing
            subsequent parts. \"bump prerel\" sets the PRERELEASE part and
            removes any BUILD part. \"bump build\" sets the BUILD part.

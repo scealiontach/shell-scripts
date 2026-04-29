@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # shellcheck source=includer.sh
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
@@ -48,12 +48,12 @@ fi
 
 function review_prs {
   local repo_fullname=$1
-  if [ "$(gh pr list --draft=false --repo "$repo_fullname" --json reviewDecision | jq -r '.[].reviewDecision' | grep -vc 'APPROVED')" -gt 0 ]; then
+  if [ "$("$_gh" pr list --draft=false --repo "$repo_fullname" --json reviewDecision | jq -r '.[].reviewDecision' | grep -vc 'APPROVED')" -gt 0 ]; then
     log::info "Found reviewable prs for $repo_fullname"
     if [ "$OPEN_BROWSER" = "true" ]; then
-      command gh pr list --repo "$repo_fullname" --web >/dev/null 2>&1
+      "$_gh" pr list --repo "$repo_fullname" --web >/dev/null 2>&1
     else
-      command gh pr list --repo "$repo_fullname"
+      "$_gh" pr list --repo "$repo_fullname"
     fi
   else
     log::debug "No reviewable prs for $repo_fullname"
@@ -64,7 +64,7 @@ function scan_interest_repos {
   local org=$1
   local repo_fullname
   for repo in $(
-    gh search repos --owner "$org" --archived=false --json name |
+    "$_gh" search repos --owner "$org" --archived=false --json name |
       jq -r '.[].name'
   ); do
     repo_fullname="$org/$repo"
@@ -78,7 +78,7 @@ function scan_organization {
   local org=$1
   local repo_fullname
   for repo in $(
-    gh search repos --owner "$org" --archived=false --json name |
+    "$_gh" search repos --owner "$org" --archived=false --json name |
       jq -r '.[].name'
   ); do
     repo_fullname="$org/$repo"
