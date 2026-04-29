@@ -67,3 +67,69 @@ setup() {
   ")
   [[ "$out" == "OK" ]]
 }
+
+@test "exec::hide swallows stdout" {
+  out=$(bash -c "
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    exec::hide bash -c 'echo stdout-hidden'
+    echo visible
+  ")
+  [[ "$out" == "visible" ]]
+  [[ "$out" != *"stdout-hidden"* ]]
+}
+
+@test "exec::hide swallows stderr" {
+  out=$(bash -c "
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    exec::hide bash -c 'echo stderr-hidden >&2'
+    echo visible
+  " 2>&1)
+  [[ "$out" == "visible" ]]
+  [[ "$out" != *"stderr-hidden"* ]]
+}
+
+@test "exec::hide preserves zero exit code" {
+  run bash -c "
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    exec::hide true
+  "
+  [ "$status" -eq 0 ]
+}
+
+@test "exec::hide preserves non-zero exit code" {
+  run bash -c "
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    exec::hide bash -c 'exit 7'
+  "
+  [ "$status" -eq 7 ]
+}
+
+@test "exec_and_hide delegates stdout suppression to exec::hide" {
+  out=$(bash -c "
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    exec_and_hide bash -c 'echo stdout-hidden'
+    echo visible
+  " 2>/dev/null)
+  [[ "$out" == "visible" ]]
+  [[ "$out" != *"stdout-hidden"* ]]
+}
+
+@test "exec_and_capture delegates exit code preservation to exec::capture" {
+  run bash -c "
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    exec_and_capture bash -c 'exit 3' >/dev/null
+  "
+  [ "$status" -eq 3 ]
+}
