@@ -33,17 +33,20 @@ pattern='^[[:space:]]*function[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*([[:space:]]*\(\
 rc=0
 for f in "$@"; do
   case "$f" in
-    bash/*.sh) ;;
+    # Accept both repo-relative paths (the form pre-commit always passes)
+    # and absolute / nested paths so the regression script and ad-hoc
+    # manual invocations exercise the same code path.
+    bash/*.sh | */bash/*.sh) ;;
     *)
-      # Pre-commit's `files` regex already restricts inputs to bash/*.sh,
-      # but skip silently if a caller invokes the hook directly on
-      # something else.
+      # Warn (not silent) so a maintainer running the hook by hand on the
+      # wrong file knows their invocation skipped it.
+      echo "$0: skipped $f (only bash/<name>.sh inputs are checked)" >&2
       continue
       ;;
   esac
   while IFS= read -r line; do
     rc=1
-    printf '%s\n' "$line" >&2
+    printf '%s:%s\n' "$f" "$line" >&2
   done < <(grep -nE "$pattern" "$f" 2>/dev/null | grep -v '::')
 done
 
