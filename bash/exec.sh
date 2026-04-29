@@ -29,11 +29,21 @@ function exec::capture() {
   local exit_code
   if [ -z "$LOGFILE_DISABLE" ] || [ "$LOGFILE_DISABLE" != "true" ]; then
     local logfile=${LOGFILE:-"exec.log"}
-    "$@" 2>&1 | tee -a "$logfile"
+    local tmpout
+    tmpout=$(mktemp)
+    trap 'rm -f "$tmpout"' RETURN
+    # Stream to caller stdout in real-time; second tee captures into tmpout.
+    "$@" 2>&1 | tee -a "$logfile" | tee "$tmpout"
     exit_code=${PIPESTATUS[0]}
+    # exec_output is an intentional output variable (no local) — callers read it.
+    # shellcheck disable=SC2034
+    exec_output=$(<"$tmpout")
   else
-    "$@" 2>&1
+    # exec_output is an intentional output variable (no local) — callers read it.
+    # shellcheck disable=SC2034
+    exec_output=$("$@" 2>&1)
     exit_code=$?
+    [[ -n "${exec_output}" ]] && printf '%s\n' "${exec_output}"
   fi
   return "${exit_code}"
 }

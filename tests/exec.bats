@@ -153,3 +153,25 @@ setup() {
   ")
   [[ "$out" == "hello" ]]
 }
+
+@test "exec::capture populates exec_output with the command's stdout" {
+  run bash -c "
+    LOGFILE_DISABLE=true
+    source '${REPO_ROOT}/bash/includer.sh'
+    @include exec
+    exec::capture echo hello >/dev/null
+    printf '%s' \"\$exec_output\"
+  "
+  [ "$output" = "hello" ]
+}
+
+@test "exec::capture populates exec_output via the tee branch" {
+  run bash -c "
+    LOGFILE='$HOME/exec-tee-output.log'
+    source '${REPO_ROOT}/bash/includer.sh'
+    @include exec
+    exec::capture echo world >/dev/null
+    printf '%s' \"\$exec_output\"
+  "
+  [ "$output" = "world" ]
+}
