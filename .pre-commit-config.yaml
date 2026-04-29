@@ -90,3 +90,12 @@ repos:
         language: system
         files: ^bash/[^/]+\.sh$
         pass_filenames: true
+      - id: check-no-bare-ret
+        name: No bare ret=$? captures
+        # Flags bare 'ret=$?', 'exit_code=$?', 'exit_status=$?', or 'rc=$?'
+        # captures inside shell functions that lack a preceding 'local'
+        # declaration. Prevents the SUR-1874 anti-pattern from regressing.
+        entry: bash tests/check-no-bare-ret.sh
+        language: system
+        types: [shell]
+        pass_filenames: true
