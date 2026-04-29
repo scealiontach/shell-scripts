@@ -54,8 +54,12 @@ for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
     log::debug "Split window on session $SESSION"
     tmux::cmd split-window -v -t "$SESSION"
   fi
-  log::debug "Execute on $SESSION: $(commands::use kubectl) $COMMAND pod/$pod $*"
-  tmux::cmd send-keys -t "$SESSION" "$(commands::use kubectl) $COMMAND pod/$pod $*" C-m
+  # Build the send-keys payload via printf %q so each positional arg
+  # round-trips through the remote shell's tokeniser intact instead of
+  # being collapsed by IFS-joined "$*". See SUR-1869.
+  payload=$(printf '%q ' "$(commands::use kubectl)" "$COMMAND" "pod/$pod" "$@")
+  log::debug "Execute on $SESSION: $payload"
+  tmux::cmd send-keys -t "$SESSION" "$payload" C-m
   log::debug "Tile window $WINDOW"
   tmux::cmd select-layout tiled
   count=$((count + 1))
