@@ -1,6 +1,9 @@
 MAKEFILE_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 include $(MAKEFILE_DIR)/standard_defs.mk
 
+DOC_SRC := $(wildcard bash/*.sh)
+BIN_SRC := $(filter-out %.sh,$(wildcard bash/*))
+
 all: package
 
 clean:
@@ -24,7 +27,7 @@ publish: package gh-create-draft-release
 package_scripts: dist/doc-$(VERSION).tar.gz dist/bin-$(VERSION).tar.gz dist/lib-$(VERSION).tar.gz
 
 
-dist/doc-$(VERSION).tar.gz:
+dist/doc-$(VERSION).tar.gz: $(DOC_SRC) bash/bashadoc
 	mkdir -p dist/doc/bash
 	for inc in $$(find bash -name \*.sh); do \
 	  mdname=$$(echo $$inc | sed -e 's/\.sh/\.md/') ; \
@@ -32,7 +35,7 @@ dist/doc-$(VERSION).tar.gz:
 	tar -zcf dist/doc-$(VERSION).tar.gz -C dist doc
 	rm -rf dist/doc
 
-dist/bin-$(VERSION).tar.gz:
+dist/bin-$(VERSION).tar.gz: $(DOC_SRC) $(BIN_SRC) bash/pack-script
 	mkdir -p dist/bin
 	for s in $$(find bash -type f -exec grep -q "includer" {} \; -print|grep -v ".sh$$"); do \
 	  base=$$(basename $$s) ; \
@@ -41,7 +44,7 @@ dist/bin-$(VERSION).tar.gz:
 	tar -zcf dist/bin-$(VERSION).tar.gz -C dist bin
 	rm -rf dist/bin
 
-dist/lib-$(VERSION).tar.gz:
+dist/lib-$(VERSION).tar.gz: $(DOC_SRC)
 	mkdir -p dist/lib
 	cp bash/*.sh dist/lib
 	tar -zcf dist/lib-$(VERSION).tar.gz -C dist lib

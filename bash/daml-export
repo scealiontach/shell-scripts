@@ -147,10 +147,9 @@ function correct_export {
 
 function build {
   local dir=${1:?}
-  local ret
 
   verifyExport "$dir"
-  ret=$?
+  local ret=$?
   if [ $ret -gt 1 ]; then
     echo "Skipping $dir since it isn't ready"
     return
@@ -241,16 +240,19 @@ while [ "$CUR_INT" -le "$STOP_INT" ]; do
   [ "$CUR_INT" -eq "$prev" ] && break
 done
 
-find "$TARGET_DIR" -name export.good -print | sort | while read -r buildFile; do
+function verify_and_build() {
+  local buildFile=${1:?}
+  local OUTPUT_DIR
+  local CURRENT_PROCS
   OUTPUT_DIR=$(dirname "$buildFile")
   verifyExport "$OUTPUT_DIR"
-  ret=$?
+  local ret=$?
   if [ $ret -gt 1 ]; then
     echo "Skipping $OUTPUT_DIR since it isn't ready"
-    continue
+    return
   elif [ $ret -eq 0 ]; then
     echo "Skipping $OUTPUT_DIR since it is already built"
-    continue
+    return
   fi
 
   correct_export "$OUTPUT_DIR"
@@ -268,5 +270,8 @@ find "$TARGET_DIR" -name export.good -print | sort | while read -r buildFile; do
 
   build "$OUTPUT_DIR" &
   RUNNING_PROCS+=($!)
+}
 
-done
+while read -r buildFile; do
+  verify_and_build "$buildFile"
+done < <(find "$TARGET_DIR" -name export.good -print | sort)

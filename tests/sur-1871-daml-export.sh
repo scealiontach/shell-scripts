@@ -38,7 +38,28 @@ if grep -vE '^[[:space:]]*#' "$script" | grep -q '"\$CUR_INT" != "\$NEXT_INT"'; 
   failures=$((failures + 1))
 fi
 
-# 3. End-to-end check: stub java + daml on PATH, run the script, count
+# 3. Static check (SUR-1883): post-loop walk must use process substitution so
+#    RUNNING_PROCS mutations are visible in the parent shell.
+if ! grep -q '< <(' "$script"; then
+  echo "FAIL: post-loop walk does not use process substitution (< <(...))" >&2
+  failures=$((failures + 1))
+fi
+
+# 4. Static check (SUR-1883): verify_and_build function must exist (extracts
+#    the bare ret=$? site out of the subshell and into a function with local ret).
+if ! grep -q 'function verify_and_build' "$script"; then
+  echo "FAIL: verify_and_build function not found in bash/daml-export" >&2
+  failures=$((failures + 1))
+fi
+
+# 5. Static check (SUR-1883): no bare ret=$? anywhere in the script
+#    (all sites must use 'local ret=$?' or be refactored to if/if ! form).
+if grep -vE '^[[:space:]]*#' "$script" | grep 'ret=\$?' | grep -qv 'local ret=\$?'; then
+  echo "FAIL: bare ret=\$? still present in bash/daml-export (must be local ret=\$?)" >&2
+  failures=$((failures + 1))
+fi
+
+# 6. End-to-end check: stub java + daml on PATH, run the script, count
 #    export.good artefacts.
 tmp_root=$(mktemp -d)
 trap 'rm -rf "$tmp_root"' EXIT
@@ -139,6 +160,27 @@ for hex_pair in \
   "00000000000003e8-00000000000005dc"; do
   if [ ! -r "$target_dir/$hex_pair/export.good" ]; then
     echo "FAIL: missing export.good for range $hex_pair" >&2
+    failures=$((failures + 1))
+  fi
+done
+
+# Behavioral check (SUR-1883 DoD: RUNNING_PROCS populated after post-loop walk).
+#
+# Direct inspection of RUNNING_PROCS from outside the script subprocess is not
+# feasible — the array lives in the script's own shell and is not exported.
+# Instead we verify the dar output files that the background 'daml build'
+# processes (tracked via RUNNING_PROCS) are responsible for producing.  If
+# process substitution is absent (pipe subshell used instead), RUNNING_PROCS
+# mutations are lost in the parent and the kill_running_procs trap silently
+# fires on zero pids; builds may still complete due to background &, but the
+# parent loses awareness of them.  The static check above (< <(...)) catches
+# the structural regression; this check verifies the builds actually ran.
+for hex_pair in \
+  "0000000000000000-00000000000001f4" \
+  "00000000000001f4-00000000000003e8" \
+  "00000000000003e8-00000000000005dc"; do
+  if [ ! -f "$target_dir/$hex_pair/.daml/dist/export-1.0.0.dar" ]; then
+    echo "FAIL: missing .daml/dist/export-1.0.0.dar for range $hex_pair (build did not run)" >&2
     failures=$((failures + 1))
   fi
 done

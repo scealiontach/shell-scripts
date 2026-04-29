@@ -17,6 +17,7 @@
 # shellcheck source=includer.sh
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
+@include annotations
 @include commands
 @include doc
 
@@ -36,18 +37,33 @@ function git::tagsinhistory() {
     sed -e 's/,$//'
 }
 
+function git::commit_url_base() {
+  @doc Return the commit-URL prefix: https://github.com/owner/repo/commit
+  @doc Emits empty string for non-GitHub remotes.
+  local base
+  base=$(git::project_url)
+  if [[ -n "$base" ]]; then
+    echo "$base/commit"
+  fi
+}
+
 function git::projecturl() {
-  @doc Get the project url of this git repository.
+  deprecated git::commit_url_base "$@"
+}
+
+function git::project_url() {
+  @doc Return the bare project URL: https://github.com/owner/repo
+  @doc No trailing /commit suffix. Emits empty string for non-GitHub remotes.
   local origin_url
   origin_url=$(git remote -v | grep "^origin" | head -1)
   if echo "$origin_url" | grep -q github; then
-    local project_url
-    project_url=$(echo "$origin_url" | awk '{print $2}')
-    project_url=${project_url//.git/}
-    project_url=${project_url//git@github.com:/}
-    project_url=${project_url//https:\/\/github.com\//}
-    project_url=${project_url//http:\/\/github.com\//}
-    echo "https://github.com/$project_url/commit"
+    local slug
+    slug=$(echo "$origin_url" | awk '{print $2}')
+    slug=${slug//.git/}
+    slug=${slug//git@github.com:/}
+    slug=${slug//https:\/\/github.com\//}
+    slug=${slug//http:\/\/github.com\//}
+    echo "https://github.com/$slug"
   fi
 }
 

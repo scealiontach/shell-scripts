@@ -49,6 +49,17 @@ setup() {
   [[ "$output" == *"pagerduty::send_event not implemented"* ]]
 }
 
+@test "pagerduty-alert -i event produces user-facing not-supported error (SUR-1865)" {
+  run bash "$REPO_ROOT/bash/pagerduty-alert" -a fake-token -s fake-svc -i event
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"not supported"* ]] || [[ "$output" == *"Unknown"* ]]
+}
+
+@test "pagerduty-alert -h does not advertise 'event' as supported (SUR-1865)" {
+  run bash "$REPO_ROOT/bash/pagerduty-alert" -h
+  [[ "$output" != *"incident or event"* ]]
+}
+
 @test "pagerduty::_incident_data emits parseable JSON with the supplied fields" {
   # Smoke-check the namespaced private helper directly (the listed rename
   # of `incident_data`).
