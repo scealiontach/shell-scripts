@@ -26,6 +26,7 @@ function exec::capture() {
   @doc Execute the provided command and capture the output to a log.
   @arg _1_ the command to execute
   @arg @ the arguments to the command
+  local exit_code
   if [ -z "$LOGFILE_DISABLE" ] || [ "$LOGFILE_DISABLE" != "true" ]; then
     local logfile=${LOGFILE:-"exec.log"}
     "$@" 2>&1 | tee -a "$logfile"
@@ -34,8 +35,7 @@ function exec::capture() {
     "$@" 2>&1
     exit_code=$?
   fi
-  # shellcheck disable=SC2086
-  return ${exit_code}
+  return "${exit_code}"
 }
 exec_and_capture() {
   @doc Deprecated in favor of exec::capture
