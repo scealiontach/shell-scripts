@@ -73,3 +73,53 @@ run_cp() {
   out=$(run_cp docker::cp_if_different 0 0 5)
   [[ "$out" == "exit_code=preset rc=3" ]]
 }
+
+# SUR-1892: exercise docker::cp through docker::cmd so the fake-PATH stub
+# binary in tests/stubs/docker is invoked instead of overriding shell functions.
+@test "docker::cp returns 0 on full success (fake-PATH stub)" {
+  run bash -c "
+    export LOGFILE_DISABLE=true LOG_DISABLE_DEBUG=true LOG_DISABLE_INFO=true
+    export DOCKER_PULL_RC=0 DOCKER_TAG_RC=0 DOCKER_PUSH_RC=0 DOCKER_ARGV_LOG=/dev/null
+    export PATH='$REPO_ROOT/tests/stubs:$PATH'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::cp from-img to-img
+  "
+  [ "$status" -eq 0 ]
+}
+
+@test "docker::cp returns 1 when docker pull fails (fake-PATH stub)" {
+  run bash -c "
+    export LOGFILE_DISABLE=true LOG_DISABLE_DEBUG=true LOG_DISABLE_INFO=true
+    export DOCKER_PULL_RC=5 DOCKER_TAG_RC=0 DOCKER_PUSH_RC=0 DOCKER_ARGV_LOG=/dev/null
+    export PATH='$REPO_ROOT/tests/stubs:$PATH'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::cp from-img to-img
+  "
+  [ "$status" -eq 1 ]
+}
+
+@test "docker::cp returns 2 when docker tag fails (fake-PATH stub)" {
+  run bash -c "
+    export LOGFILE_DISABLE=true LOG_DISABLE_DEBUG=true LOG_DISABLE_INFO=true
+    export DOCKER_PULL_RC=0 DOCKER_TAG_RC=5 DOCKER_PUSH_RC=0 DOCKER_ARGV_LOG=/dev/null
+    export PATH='$REPO_ROOT/tests/stubs:$PATH'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::cp from-img to-img
+  "
+  [ "$status" -eq 2 ]
+}
+
+@test "docker::cp returns 3 when docker push fails (fake-PATH stub)" {
+  run bash -c "
+    export LOGFILE_DISABLE=true LOG_DISABLE_DEBUG=true LOG_DISABLE_INFO=true
+    export DOCKER_PULL_RC=0 DOCKER_TAG_RC=0 DOCKER_PUSH_RC=5 DOCKER_ARGV_LOG=/dev/null
+    export PATH='$REPO_ROOT/tests/stubs:$PATH'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::cp from-img to-img
+  "
+  [ "$status" -eq 3 ]
+}

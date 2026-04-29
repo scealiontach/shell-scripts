@@ -133,3 +133,23 @@ setup() {
   "
   [ "$status" -eq 3 ]
 }
+
+@test "exec::capture writes wrapped command's stdout to caller" {
+  out=$(bash -c "
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    exec::capture echo hello
+  ")
+  [[ "$out" == "hello" ]]
+}
+
+@test "exec::capture passes stdout through via the tee branch" {
+  out=$(bash -c "
+    LOGFILE='$HOME/exec-tee.log'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    exec::capture echo hello
+  ")
+  [[ "$out" == "hello" ]]
+}
