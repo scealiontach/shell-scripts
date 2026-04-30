@@ -20,7 +20,6 @@ setup() {
 @test "secret::as_file creates a readable tempfile for an env-backed secret" {
   run bash -c "
     MY_SECRET=hunter2
-    LOGFILE_DISABLE=true
     source '$REPO_ROOT/bash/includer.sh'
     @include secret
     secret::register_env MY_SECRET
@@ -35,7 +34,6 @@ setup() {
   # stdout-only capture avoids log noise polluting the path value.
   tf=$(bash -c "
     MY_SECRET=hunter2
-    LOGFILE_DISABLE=true
     source '$REPO_ROOT/bash/includer.sh'
     @include secret
     secret::register_env MY_SECRET
@@ -47,7 +45,6 @@ setup() {
 
 @test "secret::must_exist exits non-zero for an unregistered name" {
   run bash -c "
-    LOGFILE_DISABLE=true
     source '$REPO_ROOT/bash/includer.sh'
     @include secret
     secret::must_exist UNREGISTERED_SECRET_XYZ

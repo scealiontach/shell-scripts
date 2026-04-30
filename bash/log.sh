@@ -27,8 +27,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 COMPONENT_NAME="${COMPONENT_NAME:-$(basename "${BASH_SOURCE[-1]}")}"
 LOGDIR="${LOGDIR:-$HOME}"
 LOGFILE="${LOGFILE:-$HOME/${COMPONENT_NAME}.log}"
-#shellcheck disable=SC2034
-LOGFILE_DISABLE=true
+LOGFILE_DISABLE=${LOGFILE_DISABLE:-true}
 
 export LOGFILE
 export LOG_FORMAT='%DATE %PID [%LEVEL] %MESSAGE'
