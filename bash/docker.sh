@@ -34,7 +34,9 @@ function docker::cmd() {
 }
 
 function docker::_jq() {
-  $(commands::use jq) "$@"
+  local jq_path
+  jq_path=$(commands::use jq) || return 1
+  "$jq_path" "$@"
 }
 
 function docker::inspect() {

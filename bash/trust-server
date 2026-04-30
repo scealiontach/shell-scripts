@@ -22,7 +22,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 @include options
 
 [ -r /etc/os-release ] || error::exit \
-  "trust-server: /etc/os-release not found; cannot determine distro"
+  "trust-server: /etc/os-release not found or not readable; cannot determine distro"
 # shellcheck source=/dev/null
 source /etc/os-release
 

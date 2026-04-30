@@ -45,7 +45,9 @@ function ::curl() {
 # "not on the PATH" commands::use error instead of silently emitting
 # empty output downstream (SUR-1927).
 function ::jq() {
-  $(commands::use jq) "$@"
+  local jq_path
+  jq_path=$(commands::use jq) || return 1
+  "$jq_path" "$@"
 }
 
 function bb_api_call() {

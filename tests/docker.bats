@@ -140,6 +140,7 @@ run_cp() {
     }
     docker::_jq -r '.foo' </dev/null
   "
-  [ "$status" -ne 0 ]
+  [ "$status" -eq 1 ]
   [[ "$output" == *"jq is either not installed or not on the PATH"* ]]
+  [[ "$output" != *"-r: command not found"* ]]
 }
