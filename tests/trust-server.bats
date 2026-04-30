@@ -50,10 +50,10 @@ run_dispatch() {
     @include error
     @include log
     [ -r '/non/existent/os-release' ] || error::exit \\
-      'trust-server: /etc/os-release not found; cannot determine distro'
+      'trust-server: /etc/os-release not found or not readable; cannot determine distro'
   "
   [ "$status" -ne 0 ]
-  [[ "$output" == *"/etc/os-release not found"* ]]
+  [[ "$output" == *"not found or not readable; cannot determine distro"* ]]
 }
 
 @test "trust-server case dispatch: unsupported \$ID hits default arm error" {

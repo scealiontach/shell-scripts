@@ -44,6 +44,33 @@ teardown() {
   [[ "$output" == *"https://github.com/testorg/testrepo/commit"* ]]
 }
 
+# When every subject is filtered by `grep -v '^* ci'`, ::fromto still appends
+# two blank lines; the section gate must not treat newline-only $body as content.
+@test "changelog ::full skips section when all commits match ci filter" {
+  local ci_only_fixture
+  ci_only_fixture=$(mktemp -d)
+  (
+    cd "$ci_only_fixture" || exit 1
+    git init -q -b main
+    helpers::set_git_identity
+    echo x >README
+    git add README
+    git -c commit.gpgsign=false commit -q -m "feat: bootstrap"
+    git tag v0.1.0
+    echo y >>README
+    git add README
+    git -c commit.gpgsign=false commit -q -m "ci: rubber stamp"
+    echo z >>README
+    git add README
+    git -c commit.gpgsign=false commit -q -m "ci: another stamp"
+  )
+  run bash -c "cd '$ci_only_fixture' && '$CHANGELOG'"
+  rm -rf "$ci_only_fixture"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"# CHANGELOG"* ]]
+  [[ "$output" != *"## "* ]]
+}
+
 # SUR-1939: ::full used to invoke ::fromto twice per tag iteration
 # (once to count, once to print). The capture-once refactor must
 # produce the same number of section headers AND emit the trailing
