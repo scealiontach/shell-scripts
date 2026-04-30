@@ -23,12 +23,16 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 
-# Match: optional indentation, the literal `function ` keyword, an
-# identifier that does NOT contain `::`, then either `()` or `{` or
-# end-of-line. The `function` keyword is the marker for new-style bash
-# function definitions; the parens-only `foo()` form does not trip this
-# check (see header).
-pattern='^[[:space:]]*function[[:space:]]+[a-zA-Z_][a-zA-Z0-9_]*([[:space:]]*\(\))?[[:space:]]*(\{|$)'
+# Match: optional indentation, the literal `function ` keyword, then a
+# bash identifier optionally containing `::` for namespaced names. The
+# `function` keyword is the marker for new-style bash function
+# definitions; the parens-only `foo()` form does not trip this check
+# (see header). The `::` qualifier check happens at the function-name
+# token level inside the loop below — pre-SUR-1937 the hook piped grep
+# through `grep -v '::'`, which filtered the WHOLE line and silently
+# dropped one-line definitions like `function init() { log::info ...;
+# }` (bare name, namespaced call inside the body).
+pattern='^[[:space:]]*function[[:space:]]+[a-zA-Z_][a-zA-Z0-9_:]*([[:space:]]*\(\))?[[:space:]]*(\{|$)'
 
 rc=0
 for f in "$@"; do
@@ -45,9 +49,19 @@ for f in "$@"; do
       ;;
   esac
   while IFS= read -r line; do
+    # grep -n output: "<linenum>:<body>". Strip the linenum prefix and
+    # extract the function-name token (the identifier right after the
+    # `function ` keyword) so the namespacing test runs against the
+    # name only, not the whole line.
+    body=${line#*:}
+    fname=$(printf '%s\n' "$body" |
+      sed -nE 's/^[[:space:]]*function[[:space:]]+([a-zA-Z_][a-zA-Z0-9_:]*).*/\1/p')
+    case "$fname" in
+      '' | *::*) continue ;;
+    esac
     rc=1
     printf '%s:%s\n' "$f" "$line" >&2
-  done < <(grep -nE "$pattern" "$f" 2>/dev/null | grep -v '::')
+  done < <(grep -nE "$pattern" "$f" 2>/dev/null)
 done
 
 if [ "$rc" -ne 0 ]; then
