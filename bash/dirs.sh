@@ -25,7 +25,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 function dirs::of() {
   @doc Return the directory of the calling script.
-  index=1
+  local index=1
   local SOURCE="${BASH_SOURCE[$index]}"
   local DIR
   while [ -h "$SOURCE" ]; do

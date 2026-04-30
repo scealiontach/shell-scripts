@@ -79,6 +79,31 @@ probe_level() {
 # through annotations::deprecated to the namespaced log::* function.
 # `annotations` must be sourced for `deprecated` to resolve — log.sh
 # intentionally does not include annotations to avoid a circular dep.
+@test "log::error writes to LOGFILE when caller pre-sets LOGFILE_DISABLE=false (SUR-1925)" {
+  sink="$BATS_TEST_TMPDIR/log-1925.log"
+  rm -f "$sink"
+  bash -c "
+    LOGFILE='$sink'
+    LOGFILE_DISABLE=false
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    log::error msg-from-1925
+  " 2>/dev/null
+  grep -q msg-from-1925 "$sink"
+}
+
+@test "log::error skips LOGFILE under default LOGFILE_DISABLE (SUR-1925)" {
+  sink="$BATS_TEST_TMPDIR/log-1925-default.log"
+  rm -f "$sink"
+  bash -c "
+    LOGFILE='$sink'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    log::error msg-default
+  " 2>/dev/null
+  [ ! -e "$sink" ] || [ ! -s "$sink" ]
+}
+
 @test "TRACE/DEBUG/INFO bare names still delegate to log::*" {
   out=$(bash -c "
     source '$REPO_ROOT/bash/includer.sh'

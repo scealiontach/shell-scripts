@@ -147,7 +147,13 @@ function secret::_env_as_file {
   tmpFile=$(mktemp)
   chmod 600 "$tmpFile"
   SECRET_TMPFILES+=("$tmpFile")
-  (printenv "$secretName") >"$tmpFile"
+  # Indirect expansion (works for exported and non-exported globals) avoids
+  # the printenv-only-sees-exported-vars failure mode that wrote a 0-byte
+  # file when secret::register_env had registered without exporting.
+  # printf '%s\n' preserves the trailing newline that printenv emitted, so
+  # downstream line-oriented consumers (PEM readers, etc.) see the same
+  # on-disk byte content as before.
+  printf '%s\n' "${!secretName}" >"$tmpFile"
   echo "$tmpFile"
 }
 

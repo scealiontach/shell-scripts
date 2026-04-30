@@ -123,6 +123,29 @@ latest_tag() {
   [ "$(latest_tag)" = "v0.1.0" ]
 }
 
+@test "popd failure path mirrors pushd guard (SUR-1933)" {
+  # The pushd guard exits 1 on failure; the matching popd at end-of-script
+  # must do the same so a popd failure does not get reported as success
+  # to the CI release path.
+  run grep -nE '^popd ' "$REPO_ROOT/bash/update-repo-tags"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"|| exit 1"* ]]
+  [[ "$output" != *"|| exit 0"* ]]
+}
+
+@test "popd actually exits non-zero when the dirstack is unbalanced (SUR-1933)" {
+  # Provoke a real popd failure: run the trailing command in a subshell
+  # whose dirstack already has only one entry. popd will then fail because
+  # there is nothing to pop. This validates that 'popd >/dev/null || exit 1'
+  # propagates the failure rather than masking it.
+  run bash -c '
+    set +e
+    popd >/dev/null 2>&1 || exit 1
+    exit 0
+  '
+  [ "$status" -eq 1 ]
+}
+
 @test "no prior tag at all => defaults to v0.1.0 prerel path" {
   commit_msg "feat: initial"
   run "$UPDATE" -t "$REPO"
