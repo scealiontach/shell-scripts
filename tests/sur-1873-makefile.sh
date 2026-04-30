@@ -60,7 +60,10 @@ tmp_root=$(mktemp -d)
 log_sh="$REPO_ROOT/bash/log.sh"
 log_sh_mtime=$(stat -c '%Y' "$log_sh" 2>/dev/null || stat -f '%m' "$log_sh")
 
-# shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below.
+# SC2317 (unreachable inside fn): the body only runs from the EXIT trap.
+# SC2329 (fn never invoked): same reason — older shellcheck reports SC2329,
+# newer ones SC2317; suppress both so the hook stays portable across versions.
+# shellcheck disable=SC2317,SC2329
 restore_log_sh_mtime() {
   if [ -n "$log_sh_mtime" ] && [ -f "$log_sh" ]; then
     touch -d "@$log_sh_mtime" "$log_sh" 2>/dev/null ||
