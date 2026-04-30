@@ -60,6 +60,35 @@ setup() {
   [[ "$output" != *"incident or event"* ]]
 }
 
+@test "pagerduty::send_incident propagates curl failure (SUR-1931)" {
+  # Regression for SUR-1931: previously the function logged "Sent" and
+  # returned 0 regardless of curl exit status. Stub pagerduty::_curl to
+  # exit non-zero (e.g. HTTP error code surfaced via --fail-with-body)
+  # and assert the failure propagates and an error is logged.
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include pagerduty
+    pagerduty::_curl() { return 22; }
+    pagerduty::send_incident SVC1 incident T from token
+  "
+  [ "$status" -eq 22 ]
+  [[ "$output" == *"PagerDuty incident send failed"* ]]
+  [[ "$output" != *"Sent PagerDuty incident"* ]]
+}
+
+@test "pagerduty::send_incident success path returns 0 (SUR-1931)" {
+  # The "Sent" log line is emitted at INFO level which is gated off by
+  # default; we just assert success-rc instead of probing stderr gating.
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include pagerduty
+    pagerduty::_curl() { return 0; }
+    pagerduty::send_incident SVC1 incident T from token
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"PagerDuty incident send failed"* ]]
+}
+
 @test "pagerduty::_incident_data emits parseable JSON with the supplied fields" {
   # Smoke-check the namespaced private helper directly (the listed rename
   # of `incident_data`).

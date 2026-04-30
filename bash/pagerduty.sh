@@ -66,12 +66,18 @@ function pagerduty::send_incident() {
   local alert_token="${5:?}"
   local incident_key="${6}"
 
-  pagerduty::_curl -X POST --header 'Content-Type: application/json' \
+  local rc=0
+  pagerduty::_curl --fail-with-body -sS \
+    -X POST --header 'Content-Type: application/json' \
     --header 'Accept: application/vnd.pagerduty+json;version=2' \
     --header "From: $alert_from" \
     --header "Authorization: Token token=$alert_token" \
     --data "$(pagerduty::_incident_data "$service_id" "$alert_type" "$alert_title" "$incident_key")" \
-    "${PAGERDUTY_INCIDENTS_URL:-https://api.pagerduty.com/incidents}"
+    "${PAGERDUTY_INCIDENTS_URL:-https://api.pagerduty.com/incidents}" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    log::error "PagerDuty incident send failed (curl rc=$rc)"
+    return "$rc"
+  fi
   log::info "Sent PagerDuty incident"
 }
 
