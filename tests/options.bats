@@ -65,10 +65,12 @@ setup() {
 }
 
 @test "options::add walks all args even when an arg is empty (SUR-1940)" {
-  # Regression for SUR-1940: the old `while [ -n \"\$1\" ]` guard treated an
-  # empty arg as end-of-args and silently dropped subsequent flags. With the
-  # `\$# -gt 0` guard, an empty -d "" must not stop processing of the trailing
-  # -m/-x flags.
+  # Forward-looking invariant for SUR-1940. The old `while [ -n \"\$1\" ]`
+  # guard conflates "no more args" with "next arg is empty"; no current
+  # caller exercised a sequence where \$1 became "" mid-loop, so this
+  # assertion would have passed under the old code too. Locking the
+  # invariant prevents future callers from regressing into the buggy
+  # idiom by relying on the structurally-correct `[ \"\$#\" -gt 0 ]`.
   run bash -c "
     source '$REPO_ROOT/bash/includer.sh'
     @include options
