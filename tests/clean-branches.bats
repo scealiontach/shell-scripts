@@ -131,10 +131,12 @@ EOF
 
   PATH="$stub_bin:$PATH" run "$CLEAN" -d "$LOCAL_DIR" -v -v
   [ "$status" -ne 0 ]
-  # feature/gone and feature/no-upstream both still exist because the
-  # very first branch -D failed and halted the loop.
+  # The fix's contract is "halt on the first failure" — both feature/gone
+  # and feature/no-upstream must still exist. A lenient `||` would let
+  # the test pass even if one branch was deleted before the halt.
   branches=$(git -C "$LOCAL_DIR" branch --format='%(refname:short)' | sort | tr '\n' ' ')
-  [[ "$branches" == *"feature/gone"* || "$branches" == *"feature/no-upstream"* ]]
+  [[ "$branches" == *"feature/gone"* ]]
+  [[ "$branches" == *"feature/no-upstream"* ]]
 
   rm -rf "$stub_bin"
 }
