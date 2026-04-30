@@ -79,7 +79,11 @@ function ::date_to_commit_after() {
 
 function ::full() {
   local later_tag=
-  local this_version long_version header_version change_count
+  local this_version long_version header_version body
+  # Compute the commit-URL base once per ::full invocation. SUR-1939:
+  # pre-fix this was recomputed per tag iteration.
+  local url_base
+  url_base=$(git::commit_url_base)
   echo "# CHANGELOG"
   echo
   for tag in $(git::tagsinhistory); do
@@ -93,20 +97,28 @@ function ::full() {
         header_version="$this_version"
       fi
 
-      change_count=$(::fromto "$tag" "HEAD" "$(git::commit_url_base)" | grep . | grep -v '^* ci' | uniq | wc -l)
-      if [ "$change_count" -gt 0 ]; then
+      # SUR-1939: capture ::fromto output once per iteration so we
+      # don't shell out to `git log` twice (once to count, once to
+      # print). The trailing `echo` restores the section-separator
+      # blank line that pre-fix `uniq` collapsed from ::fromto's two
+      # tail echoes — without it the regenerated CHANGELOG.md drops
+      # the final newline relative to the pre-fix output.
+      body=$(::fromto "$tag" "HEAD" "$url_base" | grep -v '^* ci' | uniq)
+      if [ -n "$body" ]; then
         if [ "$this_version" != "$tag" ]; then
           echo "## $header_version"
           echo
-          ::fromto "$tag" "HEAD" "$(git::commit_url_base)" | grep -v '^* ci' | uniq
+          printf '%s\n' "$body"
+          echo
         fi
       fi
     else
-      change_count=$(::fromto "$tag" "HEAD" "$(git::commit_url_base)" | grep . | grep -v '^* ci' | uniq | wc -l)
-      if [ "$change_count" -gt 0 ]; then
+      body=$(::fromto "$tag" "$later_tag" "$url_base" | grep -v '^* ci' | uniq)
+      if [ -n "$body" ]; then
         echo "## $later_tag"
         echo
-        ::fromto "$tag" "$later_tag" "$(git::commit_url_base)" | grep -v '^* ci' | uniq
+        printf '%s\n' "$body"
+        echo
       fi
       later_tag="$tag"
     fi
