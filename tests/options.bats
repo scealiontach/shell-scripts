@@ -42,3 +42,26 @@ setup() {
   "
   [ "$status" -ne 0 ]
 }
+
+@test "options::add walks all args even when an arg is empty (SUR-1940)" {
+  # Regression for SUR-1940: the old `while [ -n \"\$1\" ]` guard treated an
+  # empty arg as end-of-args and silently dropped subsequent flags. With the
+  # `\$# -gt 0` guard, an empty -d "" must not stop processing of the trailing
+  # -m/-x flags.
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include options
+    options::clear
+    options::add -o a -d '' -m -x A
+    options::add -o b -d 'B' -x B
+    # Print a tab-separated dump of the registered options and their flags.
+    for opt in \"\${OPTIONS[@]}\"; do
+      printf '%s|optional=%s|env=%s\n' \
+        \"\$opt\" \"\${OPTIONS_OPTIONAL[\$opt]}\" \"\${OPTIONS_ENVIRONMENT[\$opt]}\"
+    done
+  "
+  [ "$status" -eq 0 ]
+  # Both flags must be registered.
+  [[ "$output" == *"a|optional=false|env=A"* ]]
+  [[ "$output" == *"b|optional=true|env=B"* ]]
+}

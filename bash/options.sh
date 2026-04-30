@@ -80,7 +80,7 @@ function options::add() {
   local parse_fn=""
   local environment_var=""
   local opt
-  while [ -n "$1" ]; do
+  while [ "$#" -gt 0 ]; do
     opt="$1"
     shift
     case "$opt" in
