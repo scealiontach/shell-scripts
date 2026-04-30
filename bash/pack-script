@@ -83,6 +83,13 @@ for inc in $(get_all_includes "${TargetFile:?}"); do
 done
 
 grep -v "^@include" "${TargetFile}" |
+  # SUR-1926: this rewrite collapses BASH_SOURCE[N] -> BASH_SOURCE[0] for
+  # the entry script only (the included libraries above pass through
+  # untouched). In a packed script every function is defined in the same
+  # output file, so BASH_SOURCE[0], BASH_SOURCE[2], and BASH_SOURCE[-1]
+  # all resolve to the packed binary itself — collapsing to [0] keeps
+  # legacy BASH_SOURCE[N] usages working without depending on call-stack
+  # depth in the packed runtime.
   sed -E -e 's/BASH_SOURCE\[-?[0-9]+\]/BASH_SOURCE[0]/g' |
   grep -v "includer.sh" |
   grep -v "^#!" >>"${OutputFile:?}"

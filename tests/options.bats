@@ -43,6 +43,27 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "options help SYNTAX line names the entry script under -h dispatch (SUR-1926)" {
+  # Regression for SUR-1926: BASH_SOURCE[2] resolves to options.sh itself
+  # when -h is dispatched through OPTIONS_PARSE_FUNCS (one frame deeper
+  # than the no-args path). BASH_SOURCE[-1] always resolves to the entry
+  # script regardless of dispatch depth.
+  run bash "$REPO_ROOT/tests/fixtures/sur-1926-help.sh" -h
+  [ "$status" -ne 0 ]
+  # The SYNTAX line should name the fixture, not options.sh.
+  [[ "$output" == *"sur-1926-help.sh"* ]]
+  [[ "$output" != *"options.sh ["* ]]
+}
+
+@test "options help SYNTAX line names the entry script on no-args path (SUR-1926)" {
+  # The no-args path also runs through options::syntax_exit. Verify both
+  # dispatch paths report the same script name.
+  run bash "$REPO_ROOT/tests/fixtures/sur-1926-help.sh"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"sur-1926-help.sh"* ]]
+  [[ "$output" != *"options.sh ["* ]]
+}
+
 @test "options::add walks all args even when an arg is empty (SUR-1940)" {
   # Regression for SUR-1940: the old `while [ -n \"\$1\" ]` guard treated an
   # empty arg as end-of-args and silently dropped subsequent flags. With the
