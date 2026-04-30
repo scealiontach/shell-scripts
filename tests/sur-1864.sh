@@ -2,9 +2,11 @@
 # SUR-1864: bash/trust-server must not overwrite the bash special
 # variable $HOSTNAME (auto-maintained by bash; clobbering it interferes
 # with PS1, sudo, and update-ca-* hooks). The pre-fix script reassigned
-# HOSTNAME / DOMAIN at top level. The fix renames them to namespaced
-# locals (cert_host / cert_domain) and threads the pem-name parameter
-# into add-certs-amzn / add-certs-ubuntu.
+# HOSTNAME / DOMAIN at top level. The fix renamed them to namespaced
+# locals and threaded the pem-name parameter into add-certs-amzn /
+# add-certs-ubuntu. SUR-1935 later removed the dead CERT_GROUP block
+# (and the now-unused cert_host / cert_domain producers it consumed),
+# so the dynamic check below only verifies HOSTNAME survival now.
 #
 # We cannot actually run trust-server (it shells out to openssl, sudo,
 # and update-ca-*). Instead, this regression script:
@@ -40,16 +42,12 @@ HOME="$tmp_root/home"
 mkdir -p "$HOME"
 export HOME
 
-# Extract from the `_FQDN=` line through the closing `fi` of the
-# CERT_GROUP conditional. This is the entire host/domain-split block.
+# Extract from the `_FQDN=` line through (but not including) the
+# `TMPDIR=` line that immediately follows the host/domain-split block.
+# Pre-SUR-1935 this used `^fi$` as the terminator, but the dead
+# CERT_GROUP block (and its closing `fi`) was deleted in SUR-1935.
 fqdn_block="$tmp_root/parse_fqdn.sh"
-sed -n '/^_FQDN=/,/^fi$/p' "$script" >"$fqdn_block"
-
-if ! grep -q "cert_host" "$fqdn_block"; then
-  echo "FAIL: extracted FQDN-parse block does not reference cert_host" >&2
-  cat "$fqdn_block" >&2
-  failures=$((failures + 1))
-fi
+sed -n '/^_FQDN=/,/^TMPDIR=/{/^TMPDIR=/!p;}' "$script" >"$fqdn_block"
 
 (
   HOSTNAME=preset
@@ -59,13 +57,6 @@ fi
   source "$fqdn_block"
   if [ "$HOSTNAME" != "preset" ]; then
     echo "FAIL: trust-server FQDN block clobbered \$HOSTNAME (got [$HOSTNAME])" >&2
-    exit 1
-  fi
-  # And the namespaced locals must have populated correctly. shellcheck
-  # cannot see the assignments inside the sourced block.
-  # shellcheck disable=SC2154
-  if [ "$cert_host" != "cert" ] || [ "$cert_domain" != "example.com" ]; then
-    echo "FAIL: cert_host/cert_domain not derived correctly: cert_host=[${cert_host:-}] cert_domain=[${cert_domain:-}]" >&2
     exit 1
   fi
 )

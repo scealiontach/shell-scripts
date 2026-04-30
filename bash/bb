@@ -41,12 +41,21 @@ function ::curl() {
   $(commands::use curl) "$@"
 }
 
+# Local jq shim so a missing jq binary fails loudly with the standard
+# "not on the PATH" commands::use error instead of silently emitting
+# empty output downstream (SUR-1927).
+function ::jq() {
+  local jq_path
+  jq_path=$(commands::use jq) || return 1
+  "$jq_path" "$@"
+}
+
 function bb_api_call() {
   local method=$1
   local url=$2
   shift 2
   ::curl -s -X "$method" -u "$BB_USER:$BB_PAT" \
-    "$BB_HOST/rest/api/latest/$url" "$@" | jq
+    "$BB_HOST/rest/api/latest/$url" "$@" | ::jq
 }
 
 function pr-data() {
@@ -59,12 +68,12 @@ function pr-data() {
 
 function pr-count() {
   local slug=$1
-  pr-data "$slug" | jq -r '.size'
+  pr-data "$slug" | ::jq -r '.size'
 }
 
 function pr-list() {
   local slug=$1
-  pr-data "$slug" | jq -r '.values[].links.self[].href'
+  pr-data "$slug" | ::jq -r '.values[].links.self[].href'
 }
 
 case "${1:-}" in

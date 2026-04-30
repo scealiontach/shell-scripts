@@ -21,6 +21,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 @include log
 @include options
 
+[ -r /etc/os-release ] || error::exit \
+  "trust-server: /etc/os-release not found or not readable; cannot determine distro"
+# shellcheck source=/dev/null
 source /etc/os-release
 
 options::standard
@@ -32,15 +35,6 @@ options::parse "$@"
 
 # shellcheck disable=2153
 _FQDN=${FQDN//./_}
-
-cert_host=$(echo "$FQDN" | awk -F. '{print $1}')
-cert_domain=${FQDN/#${cert_host}./}
-
-CERT_GROUP="local"
-if [ -n "$cert_domain" ]; then
-  # shellcheck disable=2034
-  CERT_GROUP="$cert_domain"
-fi
 
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT INT TERM
@@ -96,10 +90,13 @@ function add-certs-ubuntu() {
 }
 
 case $ID in
-  amzn)
+  amzn | fedora | centos | rhel | rocky | almalinux)
     add-certs-amzn "${_FQDN}.pem"
     ;;
-  ubuntu | pop)
+  ubuntu | pop | debian)
     add-certs-ubuntu "${_FQDN}.pem"
+    ;;
+  *)
+    error::exit "trust-server: unsupported distro '$ID'; add a case in bash/trust-server"
     ;;
 esac
