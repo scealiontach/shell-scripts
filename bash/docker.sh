@@ -33,6 +33,10 @@ function docker::cmd() {
   fi
 }
 
+function docker::_jq() {
+  $(commands::use jq) "$@"
+}
+
 function docker::inspect() {
   @doc inspect the specified item
   @arg _1_ item to inspect
@@ -102,7 +106,7 @@ function docker::repo_tags_has() {
   @arg _2_ the tag to search for
   local from=${1:?}
   local to=${2:?}
-  for tag in $(docker::inspect "$from" | jq -r '.[].RepoTags[]'); do
+  for tag in $(docker::inspect "$from" | docker::_jq -r '.[].RepoTags[]'); do
     local other_to
     other_to=${to//index.docker.io\//}
     if [ "$tag" = "$to" ]; then
@@ -170,20 +174,20 @@ function docker::registrycmd {
   local url=${1:?}
   local registry=${2:?}
   local basic_token
-  basic_token=$(jq -r ".auths.\"$registry\".auth" ~/.docker/config.json)
+  basic_token=$(docker::_jq -r ".auths.\"$registry\".auth" ~/.docker/config.json)
   $(commands::use curl) -s -H "Authorization: Basic $basic_token" "https://$registry/v2/$url"
 }
 
 function docker::list_repositories {
   local registry=${1:?}
-  docker::registrycmd _catalog "$registry" | jq -r '.repositories[]' |
+  docker::registrycmd _catalog "$registry" | docker::_jq -r '.repositories[]' |
     sort
 }
 
 function docker::list_tags {
   local repository=${1:?}
   local registry=${2?}
-  docker::registrycmd "$repository/tags/list" "$registry" | jq -r '.tags[]' |
+  docker::registrycmd "$repository/tags/list" "$registry" | docker::_jq -r '.tags[]' |
     sort -V
 }
 

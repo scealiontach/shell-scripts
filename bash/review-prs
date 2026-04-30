@@ -8,6 +8,13 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 _gh=$(commands::use gh)
 
+# Local jq shim so a missing jq binary fails loudly with the standard
+# "not on the PATH" commands::use error instead of silently emitting
+# empty output downstream (SUR-1927).
+function ::jq() {
+  $(commands::use jq) "$@"
+}
+
 log::level 2
 function usage() {
   true
@@ -48,7 +55,7 @@ fi
 
 function review_prs {
   local repo_fullname=$1
-  if [ "$("$_gh" pr list --draft=false --repo "$repo_fullname" --json reviewDecision | jq -r '.[].reviewDecision' | grep -vc 'APPROVED')" -gt 0 ]; then
+  if [ "$("$_gh" pr list --draft=false --repo "$repo_fullname" --json reviewDecision | ::jq -r '.[].reviewDecision' | grep -vc 'APPROVED')" -gt 0 ]; then
     log::info "Found reviewable prs for $repo_fullname"
     if [ "$OPEN_BROWSER" = "true" ]; then
       "$_gh" pr list --repo "$repo_fullname" --web >/dev/null 2>&1
@@ -65,7 +72,7 @@ function scan_interest_repos {
   local repo_fullname
   for repo in $(
     "$_gh" search repos --owner "$org" --archived=false --json name |
-      jq -r '.[].name'
+      ::jq -r '.[].name'
   ); do
     repo_fullname="$org/$repo"
     if [ -d "$GIT_HOME/$repo_fullname" ]; then
@@ -79,7 +86,7 @@ function scan_organization {
   local repo_fullname
   for repo in $(
     "$_gh" search repos --owner "$org" --archived=false --json name |
-      jq -r '.[].name'
+      ::jq -r '.[].name'
   ); do
     repo_fullname="$org/$repo"
     review_prs "$repo_fullname"

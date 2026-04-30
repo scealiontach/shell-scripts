@@ -123,3 +123,23 @@ run_cp() {
   "
   [ "$status" -eq 3 ]
 }
+
+# SUR-1927: docker::_jq must surface the standard commands::use error
+# when jq is missing from PATH, instead of silently emitting nothing.
+# The override of `command` returns 1 only for `command -v jq` so
+# commands::use's missing-binary path fires while the rest of
+# includer.sh's setup keeps working.
+@test "docker::_jq fails loudly when jq is not on PATH (SUR-1927)" {
+  run bash -c "
+    export LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    command() {
+      if [ \"\$1\" = -v ] && [ \"\$2\" = jq ]; then return 1; fi
+      builtin command \"\$@\"
+    }
+    docker::_jq -r '.foo' </dev/null
+  "
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"jq is either not installed or not on the PATH"* ]]
+}
