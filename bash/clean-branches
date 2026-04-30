@@ -60,7 +60,10 @@ function delete_branch() {
     log::info "would delete branch $branch ($reason)"
   else
     log::info "Deleting branch $branch ($reason)"
-    exec::capture git::cmd branch -D "$branch"
+    if ! exec::capture git::cmd branch -D "$branch"; then
+      log::error "Failed to delete branch $branch ($reason)"
+      return 1
+    fi
   fi
 }
 
@@ -73,9 +76,9 @@ while IFS=$'\t' read -r branch upstream track; do
     continue
   fi
   if [ -z "$upstream" ]; then
-    delete_branch "$branch" "no remote"
+    delete_branch "$branch" "no remote" || exit 1
   elif [[ "$track" == *"gone"* ]]; then
-    delete_branch "$branch" "remote gone"
+    delete_branch "$branch" "remote gone" || exit 1
   fi
 done < <(git::cmd for-each-ref \
   --format='%(refname:short)%09%(upstream:short)%09%(upstream:track)' \
@@ -88,8 +91,14 @@ if [ "$CLEAN_BUILD_TAGS" = "true" ]; then
       log::info "would delete tag $tag (local + origin)"
     else
       log::info "Deleting tag $tag"
-      exec::capture git::cmd push --delete origin "$tag"
-      exec::capture git::cmd tag -d "$tag"
+      if ! exec::capture git::cmd push --delete origin "$tag"; then
+        log::error "Failed to delete remote tag $tag from origin; not removing local copy"
+        exit 1
+      fi
+      if ! exec::capture git::cmd tag -d "$tag"; then
+        log::error "Failed to delete local tag $tag (origin copy already gone)"
+        exit 1
+      fi
     fi
   done
 else

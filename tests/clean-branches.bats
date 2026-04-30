@@ -81,3 +81,60 @@ teardown() {
   v_tags=$(git -C "$LOCAL_DIR" tag -l 'v0.1.0')
   [ "$v_tags" = "v0.1.0" ]
 }
+
+# SUR-1938: write a stubbed git wrapper at $1 that fails when its first
+# two args match the pattern in $2/$3 and delegates all other invocations
+# to the real git binary.
+make_failing_git_stub() {
+  local stub_dir=$1
+  local fail_arg1=$2
+  local fail_arg2=$3
+  local real_git
+  real_git=$(command -v git)
+  cat >"$stub_dir/git" <<EOF
+#!/usr/bin/env bash
+if [ "\$1" = "$fail_arg1" ] && [ "\$2" = "$fail_arg2" ]; then
+  echo "stub: refusing \$*" >&2
+  exit 1
+fi
+exec "$real_git" "\$@"
+EOF
+  chmod +x "$stub_dir/git"
+}
+
+# SUR-1938: when 'git push --delete origin <tag>' fails, the destructive
+# loop must halt and the local tag must NOT be deleted (otherwise the
+# caller is left with a remote tag and no local breadcrumb).
+@test "-T halts when 'git push --delete' fails; local tag preserved (SUR-1938)" {
+  local stub_bin
+  stub_bin=$(mktemp -d)
+  make_failing_git_stub "$stub_bin" push --delete
+  unset _git
+
+  PATH="$stub_bin:$PATH" run "$CLEAN" -d "$LOCAL_DIR" -T -v -v
+  [ "$status" -ne 0 ]
+  # The local tag must still be present — local 'git tag -d' must not have
+  # run after the push --delete failure.
+  local_tags=$(git -C "$LOCAL_DIR" tag -l 'build/1.0')
+  [ "$local_tags" = "build/1.0" ]
+
+  rm -rf "$stub_bin"
+}
+
+# SUR-1938: when 'git branch -D <branch>' fails, the loop must halt with
+# non-zero status (not silently continue to the next iteration).
+@test "branch loop halts when 'git branch -D' fails (SUR-1938)" {
+  local stub_bin
+  stub_bin=$(mktemp -d)
+  make_failing_git_stub "$stub_bin" branch -D
+  unset _git
+
+  PATH="$stub_bin:$PATH" run "$CLEAN" -d "$LOCAL_DIR" -v -v
+  [ "$status" -ne 0 ]
+  # feature/gone and feature/no-upstream both still exist because the
+  # very first branch -D failed and halted the loop.
+  branches=$(git -C "$LOCAL_DIR" branch --format='%(refname:short)' | sort | tr '\n' ' ')
+  [[ "$branches" == *"feature/gone"* || "$branches" == *"feature/no-upstream"* ]]
+
+  rm -rf "$stub_bin"
+}
