@@ -24,9 +24,36 @@ setup() {
     @include secret
     secret::register_env MY_SECRET
     tf=\$(secret::as_file MY_SECRET 2>/dev/null)
-    [ -r \"\$tf\" ]
+    [ -r \"\$tf\" ] && [ \"\$(cat \"\$tf\")\" = hunter2 ]
   "
   [ "$status" -eq 0 ]
+}
+
+@test "secret::as_file works for non-exported register_env (SUR-1930)" {
+  # Caller deliberately does NOT 'export' MY_SECRET. The previous printenv
+  # implementation produced a 0-byte file in this case. Indirect expansion
+  # must read the variable regardless.
+  out=$(bash -c "
+    MY_SECRET=hunter2
+    source '$REPO_ROOT/bash/includer.sh'
+    @include secret
+    secret::register_env MY_SECRET
+    tf=\$(secret::as_file MY_SECRET 2>/dev/null)
+    cat \"\$tf\"
+  ")
+  [ "$out" = "hunter2" ]
+}
+
+@test "secret::as_file works for two-arg register_env nameref (SUR-1930)" {
+  out=$(bash -c "
+    REAL=hunter2
+    source '$REPO_ROOT/bash/includer.sh'
+    @include secret
+    secret::register_env ALIAS REAL
+    tf=\$(secret::as_file ALIAS 2>/dev/null)
+    cat \"\$tf\"
+  ")
+  [ "$out" = "hunter2" ]
 }
 
 @test "secret::as_file tempfile is shredded after subshell EXIT" {

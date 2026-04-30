@@ -48,10 +48,11 @@ function secret::register_env {
   local targetVar=$2
   if [ -z "$targetVar" ]; then
     SECRETS[$varName]="environment"
-    declare -g "$varName=${!varName}"
+    declare -gx "$varName=${!varName}"
   else
     SECRETS[$varName]="environment"
     declare -g -n "$varName=${targetVar}"
+    export "${targetVar?}"
   fi
   secret::_install_cleanup_trap
 }
@@ -147,7 +148,10 @@ function secret::_env_as_file {
   tmpFile=$(mktemp)
   chmod 600 "$tmpFile"
   SECRET_TMPFILES+=("$tmpFile")
-  (printenv "$secretName") >"$tmpFile"
+  # Indirect expansion (works for exported and non-exported globals) avoids
+  # the printenv-only-sees-exported-vars failure mode that wrote a 0-byte
+  # file when secret::register_env had registered without exporting.
+  printf '%s' "${!secretName}" >"$tmpFile"
   echo "$tmpFile"
 }
 
