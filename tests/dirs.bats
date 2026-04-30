@@ -43,6 +43,18 @@ setup() {
   [ "$status" -ne 0 ]
 }
 
+@test "dirs::of does not leak index to caller scope (SUR-1924)" {
+  # In a subshell so we observe the caller-side `index` after dirs::of runs.
+  out=$(bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include dirs
+    index=outer
+    dirs::of >/dev/null
+    echo \"index=\$index\"
+  ")
+  [ "$out" = "index=outer" ]
+}
+
 @test "dirs::safe_rmrf removes a real tempdir" {
   d=$(mktemp -d)
   echo content >"$d/file"
