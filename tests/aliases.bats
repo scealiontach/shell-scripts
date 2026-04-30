@@ -71,3 +71,46 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" =~ "install -m 0755" ]]
 }
+
+# ---------- get_latest_btp_branch (SUR-1928) ----------------------------------
+
+@test "get_latest_btp_branch declares loop vars local (SUR-1928)" {
+  run awk '/^function get_latest_btp_branch/,/^}$/' "$ALIASES"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "local d b branch" ]]
+}
+
+@test "get_latest_btp_branch does not leak \$branch to caller (SUR-1928)" {
+  fixture=$(mktemp -d)
+  mkdir -p "$fixture/repo-a/.git"
+
+  stub_bin=$(mktemp -d)
+  cat >"$stub_bin/git" <<'EOF'
+#!/usr/bin/env bash
+# git branch -la → emit one fake remote-tracking ref so the inner loop runs.
+# git checkout … → no-op success.
+case "$1 $2" in
+  "branch -la")
+    printf '  remotes/origin/btp-releases-2025-04\n'
+    ;;
+  "checkout "*)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+EOF
+  chmod +x "$stub_bin/git"
+
+  PATH="$stub_bin:$PATH"
+  cd "$fixture"
+  branch=outer
+  # shellcheck disable=SC1090
+  source "$ALIASES"
+  get_latest_btp_branch >/dev/null 2>&1 || true
+  [ "$branch" = "outer" ]
+
+  cd /
+  rm -rf "$fixture" "$stub_bin"
+}

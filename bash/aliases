@@ -209,6 +209,7 @@ function ua {
 }
 
 function get_latest_btp_branch {
+  local d b branch
   for d in *; do
     echo "Check $d"
     if [ -d "$d/.git" ]; then
