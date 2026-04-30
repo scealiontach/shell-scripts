@@ -67,6 +67,11 @@ function pagerduty::send_incident() {
   local incident_key="${6}"
 
   local rc=0
+  # --fail-with-body needs curl >= 7.76.0 (Apr 2021). On older hosts curl
+  # exits non-zero with "option unknown" — caller still sees a non-zero rc
+  # below, just with a less specific error body than --fail-with-body
+  # would give. Drop to plain --fail if a target environment ships an
+  # older curl.
   pagerduty::_curl --fail-with-body -sS \
     -X POST --header 'Content-Type: application/json' \
     --header 'Accept: application/vnd.pagerduty+json;version=2' \
