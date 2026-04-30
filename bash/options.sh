@@ -33,7 +33,11 @@ declare -g OPTIONS_DESCRIPTION
 
 function options::syntax_exit() {
   @doc Print the command syntax and exit
-  options::help "$(basename "${BASH_SOURCE[2]}")"
+  # Use BASH_SOURCE[-1] (bottom of the call stack = entry script) instead
+  # of BASH_SOURCE[2]: when -h is dispatched via OPTIONS_PARSE_FUNCS the
+  # call stack is one frame deeper than on the no-args path, and [2]
+  # then resolves to options.sh itself. SUR-1926.
+  options::help "$(basename "${BASH_SOURCE[-1]}")"
   exit 1
 }
 
@@ -80,7 +84,7 @@ function options::add() {
   local parse_fn=""
   local environment_var=""
   local opt
-  while [ -n "$1" ]; do
+  while [ "$#" -gt 0 ]; do
     opt="$1"
     shift
     case "$opt" in
@@ -210,7 +214,10 @@ function options::help() {
   @arg _1_ optionally specify the command name
   local cmd
   if [ -z "$1" ]; then
-    cmd="${BASH_SOURCE[2]}"
+    # SUR-1926: BASH_SOURCE[-1] = entry script regardless of how deep the
+    # dispatch path is (no-args -> options::syntax_exit -> options::help vs
+    # -h -> OPTIONS_PARSE_FUNCS -> options::syntax_exit -> options::help).
+    cmd="${BASH_SOURCE[-1]}"
   else
     cmd="$1"
   fi

@@ -42,3 +42,49 @@ setup() {
   "
   [ "$status" -ne 0 ]
 }
+
+@test "options help SYNTAX line names the entry script under -h dispatch (SUR-1926)" {
+  # Regression for SUR-1926: BASH_SOURCE[2] resolves to options.sh itself
+  # when -h is dispatched through OPTIONS_PARSE_FUNCS (one frame deeper
+  # than the no-args path). BASH_SOURCE[-1] always resolves to the entry
+  # script regardless of dispatch depth.
+  run bash "$REPO_ROOT/tests/fixtures/sur-1926-help.sh" -h
+  [ "$status" -ne 0 ]
+  # The SYNTAX line should name the fixture, not options.sh.
+  [[ "$output" == *"sur-1926-help.sh"* ]]
+  [[ "$output" != *"options.sh ["* ]]
+}
+
+@test "options help SYNTAX line names the entry script on no-args path (SUR-1926)" {
+  # The no-args path also runs through options::syntax_exit. Verify both
+  # dispatch paths report the same script name.
+  run bash "$REPO_ROOT/tests/fixtures/sur-1926-help.sh"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"sur-1926-help.sh"* ]]
+  [[ "$output" != *"options.sh ["* ]]
+}
+
+@test "options::add walks all args even when an arg is empty (SUR-1940)" {
+  # Forward-looking invariant for SUR-1940. The old `while [ -n \"\$1\" ]`
+  # guard conflates "no more args" with "next arg is empty"; no current
+  # caller exercised a sequence where \$1 became "" mid-loop, so this
+  # assertion would have passed under the old code too. Locking the
+  # invariant prevents future callers from regressing into the buggy
+  # idiom by relying on the structurally-correct `[ \"\$#\" -gt 0 ]`.
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include options
+    options::clear
+    options::add -o a -d '' -m -x A
+    options::add -o b -d 'B' -x B
+    # Print a tab-separated dump of the registered options and their flags.
+    for opt in \"\${OPTIONS[@]}\"; do
+      printf '%s|optional=%s|env=%s\n' \
+        \"\$opt\" \"\${OPTIONS_OPTIONAL[\$opt]}\" \"\${OPTIONS_ENVIRONMENT[\$opt]}\"
+    done
+  "
+  [ "$status" -eq 0 ]
+  # Both flags must be registered.
+  [[ "$output" == *"a|optional=false|env=A"* ]]
+  [[ "$output" == *"b|optional=true|env=B"* ]]
+}

@@ -52,7 +52,26 @@ fi
 # that would delete markers/ and build/ (via clean_dirs_standard), breaking
 # any subsequent 'make archive' call in CI after this test completes.
 tmp_root=$(mktemp -d)
-trap 'rm -rf "$tmp_root"' EXIT
+
+# Capture log.sh mtime so we can restore it on cleanup. The 'touch' below
+# bumps it to force an incremental rebuild; leaving it bumped pollutes the
+# working tree (invisible to git status but visible to subsequent make
+# invocations in CI). Use GNU stat first, fall back to BSD on macOS.
+log_sh="$REPO_ROOT/bash/log.sh"
+log_sh_mtime=$(stat -c '%Y' "$log_sh" 2>/dev/null || stat -f '%m' "$log_sh")
+
+# SC2317 (unreachable inside fn): the body only runs from the EXIT trap.
+# SC2329 (fn never invoked): same reason — older shellcheck reports SC2329,
+# newer ones SC2317; suppress both so the hook stays portable across versions.
+# shellcheck disable=SC2317,SC2329
+restore_log_sh_mtime() {
+  if [ -n "$log_sh_mtime" ] && [ -f "$log_sh" ]; then
+    touch -d "@$log_sh_mtime" "$log_sh" 2>/dev/null ||
+      touch -t "$(date -r "$log_sh_mtime" '+%Y%m%d%H%M.%S')" "$log_sh"
+  fi
+}
+
+trap 'restore_log_sh_mtime; rm -rf "$tmp_root"' EXIT
 
 dist_backup="$tmp_root/dist_backup"
 if [ -d "$REPO_ROOT/dist" ]; then

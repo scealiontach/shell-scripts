@@ -93,7 +93,9 @@ function update_eksctl {
 function update_helm {
   # Pinned version: bump manually after reviewing release notes.
   # Avoids piping a network-fetched master-branch script straight to bash.
-  local helm_version=v3.16.4
+  # Override at runtime: HELM_VERSION=v3.17.0 update_helm
+  # Checksum URL: https://get.helm.sh/helm-VERSION-OS-ARCH.tar.gz.sha256sum
+  local helm_version=${HELM_VERSION:-v3.16.4}
   local arch
   case "$(uname -m)" in
     x86_64) arch=amd64 ;;
@@ -108,12 +110,41 @@ function update_helm {
   local tmpdir
   tmpdir=$(mktemp -d)
   trap 'rm -rf "$tmpdir"' RETURN
-  if ! curl -fsSL -o "$tmpdir/helm.tgz" \
-    "https://get.helm.sh/helm-${helm_version}-${os}-${arch}.tar.gz"; then
+  local tarball="helm-${helm_version}-${os}-${arch}.tar.gz"
+  local base_url="https://get.helm.sh"
+  if ! curl -fsSL -o "$tmpdir/${tarball}" "${base_url}/${tarball}"; then
     echo "update_helm: download failed" >&2
     return 1
   fi
-  tar xz -C "$tmpdir" -f "$tmpdir/helm.tgz"
+  if ! curl -fsSL -o "$tmpdir/${tarball}.sha256sum" \
+    "${base_url}/${tarball}.sha256sum"; then
+    echo "update_helm: checksum file download failed" >&2
+    return 1
+  fi
+  # Helm publishes "<sha256>  <tarball>" per release. Defensive parse: take
+  # the first whitespace-separated field. If Helm's release-process docs
+  # (https://helm.sh/docs/community/release_checklist/) ever change the
+  # format, the empty-hash guard catches the regression loudly.
+  local expected_hash
+  expected_hash=$(awk '{print $1}' "$tmpdir/${tarball}.sha256sum")
+  if [ -z "$expected_hash" ]; then
+    echo "update_helm: empty/unparseable checksum file" >&2
+    return 1
+  fi
+  local -a sha_cmd
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha_cmd=(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then
+    sha_cmd=(shasum -a 256)
+  else
+    echo "update_helm: no sha256 tool found (install coreutils or shasum)" >&2
+    return 1
+  fi
+  if ! echo "${expected_hash}  $tmpdir/${tarball}" | "${sha_cmd[@]}" --check --status; then
+    echo "update_helm: SHA-256 verification failed" >&2
+    return 1
+  fi
+  tar xz -C "$tmpdir" -f "$tmpdir/${tarball}"
   mkdir -p "$HOME/.local/bin"
   mv "$tmpdir/${os}-${arch}/helm" "$HOME/.local/bin/helm"
 }
