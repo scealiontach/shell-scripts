@@ -99,3 +99,6 @@ repos:
         language: system
         types: [shell]
         pass_filenames: true
+        # Intentional bare captures for SUR-1936 hook tests; see
+        # tests/check-no-bare-ret.bats.
+        exclude: ^tests/fixtures/check-no-bare-ret/
