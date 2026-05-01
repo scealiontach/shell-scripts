@@ -31,13 +31,20 @@ options::add -o n -d "namespace to query (default: current context)" -a -e NAMES
 options::parse "$@"
 
 log::info "Copying keys from pods with label $LABEL"
-for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
+while IFS= read -r pod; do
+  [[ -z "$pod" ]] && continue
   node_name=$(k8s::ctl get pod "$pod" -o json | $(commands::use jq) -r '.spec.nodeName')
   log::info "Working on $node_name with pod $pod"
   mkdir -p "keys/$node_name"
-  ln -s "$node_name" "keys/$pod"
-  exec::capture k8s::ctl cp "$pod:/etc/sawtooth/keys/validator.priv" \
-    "keys/$node_name/validator.priv" -c validator
-  exec::capture k8s::ctl cp "$pod:/etc/sawtooth/keys/validator.pub" \
-    "keys/$node_name/validator.pub" -c validator
-done
+  ln -snf "$node_name" "keys/$pod"
+  if ! exec::capture k8s::ctl cp "$pod:/etc/sawtooth/keys/validator.priv" \
+    "keys/$node_name/validator.priv" -c validator; then
+    log::error "kubectl cp failed for pod $pod (validator.priv)"
+    exit 1
+  fi
+  if ! exec::capture k8s::ctl cp "$pod:/etc/sawtooth/keys/validator.pub" \
+    "keys/$node_name/validator.pub" -c validator; then
+    log::error "kubectl cp failed for pod $pod (validator.pub)"
+    exit 1
+  fi
+done < <(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort)

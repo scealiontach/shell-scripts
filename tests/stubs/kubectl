@@ -7,11 +7,32 @@
 #   * If the argv contains the substring "-o name" anywhere, prints a
 #     fixed two-line listing (pod/example-pod-1, pod/example-pod-2)
 #     regardless of the label selector, namespace, or any other flags.
+#   * If argv starts with "cp", touches local destination paths under
+#     keys/.../*.priv|*.pub when KUBECTL_CP_FAIL is unset; exits 1 when
+#     KUBECTL_CP_FAIL=1 (copy-keys failure tests).
+#   * If argv is "get pod" (singular) with "-o json", prints minimal JSON
+#     with spec.nodeName (copy-keys / against-each-pod).
 #   * For all other invocations, prints nothing and exits 0.
-#
-# A new caller that needs different fixture data should either teach
-# this stub a new case clause or use its own per-test stub.
 echo "$@" >>"${KUBECTL_ARGV_LOG:-/dev/null}"
+
+if [[ "${1:-}" == "cp" ]]; then
+  if [[ "${KUBECTL_CP_FAIL:-}" == "1" ]]; then
+    exit 1
+  fi
+  for arg in "$@"; do
+    if [[ "$arg" == keys/*/*.priv || "$arg" == keys/*/*.pub ]]; then
+      mkdir -p "$(dirname "$arg")"
+      touch "$arg"
+    fi
+  done
+  exit 0
+fi
+
+if [[ "${1:-}" == "get" && "${2:-}" == "pod" && "$*" == *"-o json"* ]]; then
+  echo '{"spec":{"nodeName":"stub-node"}}'
+  exit 0
+fi
+
 case "$*" in
   *"-o name"*)
     echo "pod/example-pod-1"

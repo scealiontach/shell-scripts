@@ -10,9 +10,7 @@ setup() {
   PATH="$STUB_BIN:$PATH"
   unset _kubectl
   AGAINST="$REPO_ROOT/bash/against-each-pod"
-  # `clear` would otherwise scrub bats output mid-test.
-  TERM=dumb
-  export STUB_BIN KUBECTL_ARGV_LOG PATH AGAINST TERM
+  export STUB_BIN KUBECTL_ARGV_LOG PATH AGAINST
 }
 
 teardown() {
@@ -40,4 +38,20 @@ teardown() {
   # assert the listing line itself does not include -n.
   first=$(head -n1 "$KUBECTL_ARGV_LOG")
   [[ "$first" != *" -n "* ]]
+}
+
+@test "against-each-pod default path does not invoke clear" {
+  clear_dir=$(mktemp -d)
+  CLEAR_INVOKED=$(mktemp)
+  export CLEAR_INVOKED
+  cat >"$clear_dir/clear" <<'EOS'
+#!/bin/sh
+echo invoked >>"$CLEAR_INVOKED"
+EOS
+  chmod +x "$clear_dir/clear"
+  PATH="$clear_dir:$STUB_BIN:$PATH"
+  run "$AGAINST" app=foo describe
+  [[ ! -s "$CLEAR_INVOKED" ]]
+  rm -f "$CLEAR_INVOKED"
+  rm -rf "$clear_dir"
 }

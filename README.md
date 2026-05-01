@@ -42,7 +42,8 @@ function mypkg::do_thing() {
 ```
 
 `bash/mddoc <file>` extracts literate-markdown blocks from a script —
-any line beginning `## @md` becomes a markdown line in the output.
+any line where optional leading whitespace is followed by `## @md`
+becomes a markdown line in the output (the marker prefix is stripped).
 This is useful for keeping prose alongside the script that explains it.
 
 ## Building

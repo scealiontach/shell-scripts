@@ -35,7 +35,6 @@ LABEL=${1:?label required as first positional arg}
 shift
 COMMAND=${1:?subcommand required as second positional arg}
 shift
-clear
 for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
   node_name=$(k8s::ctl get pod "$pod" -o json |
     $(commands::use jq) -r '.spec.nodeName')
