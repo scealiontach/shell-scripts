@@ -14,11 +14,24 @@
 # limitations under the License.
 # ------------------------------------------------------------------------------
 #
-# Extract literate-markdown blocks from a script. Any line matching the
-# pattern `## @md ...` is emitted with the `## @md ` prefix stripped, so a
-# script can carry markdown prose interleaved with its code and have the
-# prose extracted verbatim. Usage: `mddoc <file>` writes the extracted
-# markdown to stdout. Lines without the marker are ignored.
+# Extract literate-markdown blocks from a script. Any line whose leading
+# whitespace is followed by `## @md` is emitted with the marker prefix
+# stripped, so a script can carry markdown prose interleaved with its code
+# and have the prose extracted verbatim. Usage: `mddoc <file>` writes the
+# extracted markdown to stdout. Lines without the marker are ignored.
+
+if [ -z "${1:-}" ]; then
+  echo "mddoc: usage: mddoc <file>" >&2
+  exit 1
+fi
+if [ "$#" -ne 1 ]; then
+  echo "mddoc: expected exactly one file argument" >&2
+  exit 1
+fi
+if [ ! -f "$1" ] || [ ! -r "$1" ]; then
+  echo "mddoc: not a readable regular file: $1" >&2
+  exit 1
+fi
 
 # shellcheck disable=SC1090
-grep '^\s*## @md' "$1" | sed -e 's/^\s*## @md\s*//'
+grep '^[[:space:]]*## @md' "$1" | sed -e 's/^[[:space:]]*## @md[[:space:]]*//'
