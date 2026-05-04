@@ -31,8 +31,8 @@ options::add -o s -d "use ssh" -x USE_SSH
 options::parse_available "$@"
 shift $((OPTIND - 1))
 
-_dmidecode=(/sbin/dmidecode)
-_lsmod=(/sbin/lsmod)
+_dmidecode=("$(commands::use dmidecode)")
+_lsmod=("$(commands::use lsmod)")
 _driver=(modinfo isgx --field=srcversion)
 
 vendor_cmd=("${_dmidecode[@]}" -s bios-vendor)
