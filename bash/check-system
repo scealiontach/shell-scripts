@@ -42,24 +42,31 @@ if [ "$USE_SSH" != "true" ]; then
 
   function resolve_admin_tool() {
     local name=${1:?}
-    local path
+    local __outvar=${2:?}
+    local path dir
     path=$(command -v "$name" 2>/dev/null) || true
     if [ -n "$path" ]; then
-      printf '%s\n' "$path"
+      printf -v "$__outvar" '%s' "$path"
       return 0
     fi
-    local dir
     for dir in "${_check_system_sbin_fallback_dirs[@]}"; do
       if [ -x "$dir/$name" ]; then
-        printf '%s\n' "$dir/$name"
+        printf -v "$__outvar" '%s' "$dir/$name"
         return 0
       fi
     done
-    commands::err_not_found "$name"
+    return 1
   }
 
-  _dmidecode=("$(resolve_admin_tool dmidecode)")
-  _lsmod=("$(resolve_admin_tool lsmod)")
+  _check_system_admin_tool_path=
+  if ! resolve_admin_tool dmidecode _check_system_admin_tool_path; then
+    commands::err_not_found dmidecode
+  fi
+  _dmidecode=("$_check_system_admin_tool_path")
+  if ! resolve_admin_tool lsmod _check_system_admin_tool_path; then
+    commands::err_not_found lsmod
+  fi
+  _lsmod=("$_check_system_admin_tool_path")
   vendor_cmd=("${_dmidecode[@]}" -s bios-vendor)
   version_cmd=("${_dmidecode[@]}" -s bios-version)
   release_cmd=("${_dmidecode[@]}" -s bios-release-date)

@@ -47,19 +47,31 @@ WorkingDir=${WorkingDir:-$WatchDir}
 # Throttle logic compares fractional elapsed time in awk; fail at startup if missing.
 _awk=$(commands::use awk)
 
-# Seconds since epoch with fractional part when available (Bash 5.1+ EPOCHREALTIME,
-# else python3, else GNU date). Used so SUR-2242 can compare elapsed wall time to
-# fractional `read -t` without relying on `$SECONDS` (whole seconds only).
-function _on_change_monotonic_now() {
-  if [ "${BASH_VERSINFO[0]}" -gt 5 ] ||
-    { [ "${BASH_VERSINFO[0]}" -eq 5 ] && [ "${BASH_VERSINFO[1]}" -ge 1 ]; }; then
-    printf '%s\n' "${EPOCHREALTIME}"
-    return 0
-  fi
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -c 'import time; print(time.time())'
-    return 0
-  fi
+# Wall-clock epoch seconds (not CLOCK_MONOTONIC) with a fractional part when
+# available. Order: Bash 5.1+ EPOCHREALTIME when set; else subsecond `date +%s.%N`
+# when supported (cheap, before python3); else python3; else whole-second `date`.
+# Bash 3.2 uses exit status 1 for both EOF and `read -t` timeout, so SUR-2242
+# compares elapsed time to `wait_time`. Whole-second stamps can yield (end-start)
+# == 0 across a real integer `read -t` timeout in the same wall second, which
+# wrongly triggers sleep after timeout — Bash <4 therefore refuses to run without
+# a subsecond clock source (SUR-2242 / review).
+_ON_CHANGE_EPOCH_SOURCE=
+
+function _on_change_date_has_subsecond() {
+  local frac
+  frac=$(date +%s.%N 2>/dev/null) || frac=
+  case $frac in
+    *.*)
+      case ${frac##*.} in
+        '' | *[!0-9]*) return 1 ;;
+        *) return 0 ;;
+      esac
+      ;;
+  esac
+  return 1
+}
+
+function _on_change_epoch_now_from_date() {
   local frac
   frac=$(date +%s.%N 2>/dev/null) || frac=
   case $frac in
@@ -71,6 +83,51 @@ function _on_change_monotonic_now() {
       ;;
     *) printf '%s\n' "$(date +%s).0" ;;
   esac
+}
+
+function _on_change_init_epoch_source() {
+  if [ -n "${EPOCHREALTIME-}" ]; then
+    _ON_CHANGE_EPOCH_SOURCE=epochrealtime
+    return 0
+  fi
+  if _on_change_date_has_subsecond; then
+    _ON_CHANGE_EPOCH_SOURCE=date_frac
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    _ON_CHANGE_EPOCH_SOURCE=python
+    return 0
+  fi
+  if [ "${BASH_VERSINFO[0]}" -lt 4 ]; then
+    error::exit "on-change: Bash ${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]} stdin throttling needs subsecond time; install python3, use date(1) with %N, or use Bash 4+."
+  fi
+  _ON_CHANGE_EPOCH_SOURCE=whole
+}
+
+function _on_change_epoch_now() {
+  case ${_ON_CHANGE_EPOCH_SOURCE:?} in
+    epochrealtime) printf '%s\n' "${EPOCHREALTIME}" ;;
+    date_frac) _on_change_epoch_now_from_date ;;
+    python) python3 -c 'import time; print(time.time())' ;;
+    whole) printf '%s\n' "$(date +%s).0" ;;
+  esac
+}
+
+# Integer seconds for read -t on Bash <4 (fractional -t is rejected). When
+# wait_time resolves to <=0, print min_when_nonpositive (the follow-up read
+# after -t 0 uses 1 so a slow pipe cannot block indefinitely; the main poll
+# path uses 0 for read -t 0).
+function _on_change_read_t_ceil_seconds() {
+  local w="${1:?}"
+  local min_when_nonpositive="${2:-0}"
+  "$_awk" -v w="$w" -v min0="$min_when_nonpositive" 'BEGIN {
+    x = w + 0
+    if (x <= 0) { print min0; exit }
+    y = int(x)
+    if (y < x) y++
+    if (y < 1) y = 1
+    print y
+  }'
 }
 
 function wait_for_change() {
@@ -89,16 +146,20 @@ function wait_for_change() {
     # and would tight-poll find|cksum. Throttle those with sleep (SUR-2242).
     # Bash 4+ signals a timeout with exit status >128; Bash 3.2 uses status 1
     # for both EOF and timeout, so compare elapsed wall time to `wait_time`
-    # (via _on_change_monotonic_now; `$SECONDS` is whole seconds and breaks
+    # (via _on_change_epoch_now; `$SECONDS` is whole seconds and breaks
     # fractional `-t`).  For non-TTY stdin and `-t 0`, the first `read -t 0` does
     # not assign a line; it only reports whether input is available, and `/dev/null`
     # still yields status 0. A follow-up `read -t` with a tiny timeout actually
     # reads the line (or EOF), so throttle logic can treat real input like before
-    # SUR-2242 (SUR-2242 follow-up).  Bash 3.2 only accepts integer -t; use plain
-    # read after a successful -t 0 probe there instead of subsecond -t.
+    # SUR-2242 (SUR-2242 follow-up).  Bash 3.2 only accepts integer -t; after a
+    # successful -t 0 probe, use `read -t` with an integer cap (ceil of WaitTime,
+    # at least 1s) so a slow pipe cannot block indefinitely (code review / macOS
+    # Bash 3.x).  The same ceil applies to the main `read -t` when Bash <4 (the
+    # non-TTY + non-zero WaitTime path uses the `else` branch; a raw fractional
+    # timeout would spam "invalid timeout specification" each loop).
     cmd_input=
     local read_start read_end read_status
-    read_start=$(_on_change_monotonic_now)
+    read_start=$(_on_change_epoch_now)
     if ! [ -t 0 ] &&
       "$_awk" -v w="$wait_time" 'BEGIN { exit ((w + 0) == 0 ? 0 : 1) }'; then
       read -r -t 0 _
@@ -107,27 +168,37 @@ function wait_for_change() {
         if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
           read -r -t 0.01 cmd_input
         else
-          read -r cmd_input
+          read -r -t "$(_on_change_read_t_ceil_seconds "$wait_time" 1)" cmd_input
         fi
         read_status=$?
       fi
     else
-      read -r -t "$wait_time" cmd_input
+      if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
+        read -r -t "$wait_time" cmd_input
+      else
+        read -r -t "$(_on_change_read_t_ceil_seconds "$wait_time" 0)" cmd_input
+      fi
       read_status=$?
     fi
-    read_end=$(_on_change_monotonic_now)
+    read_end=$(_on_change_epoch_now)
+    # Throttle tight loops when stdin is not a TTY (e.g. </dev/null): sleep for
+    # WaitTime, not a fixed 1s (SUR-2242 / review).  Bash 3.2 uses status 1 for
+    # both EOF and timeout, so only sleep when elapsed wall time is still well
+    # below WaitTime — otherwise a true read timeout would double-wait.
     if [ "$read_status" -gt 128 ]; then
       true
     elif ! [ -t 0 ] &&
-      "$_awk" -v w="$wait_time" 'BEGIN { exit ((w + 0) == 0 ? 0 : 1) }' &&
-      { [ "$read_status" -ne 0 ] || [ -z "$cmd_input" ]; }; then
-      sleep 1
-    elif [ "$read_status" -ne 0 ] &&
+      "$_awk" -v w="$wait_time" 'BEGIN { exit ((w + 0) != 0 ? 0 : 1) }' &&
+      [ "$read_status" -ne 0 ] &&
       "$_awk" -v s="$read_start" -v e="$read_end" -v w="$wait_time" 'BEGIN {
         if ((e - s) + 1e-9 < (w + 0)) exit 0
         exit 1
       }'; then
       sleep "$wait_time"
+    elif ! [ -t 0 ] &&
+      "$_awk" -v w="$wait_time" 'BEGIN { exit ((w + 0) == 0 ? 0 : 1) }' &&
+      [ "$read_status" -ne 0 ]; then
+      sleep 1
     fi
     if [ "$cmd_input" = "X" ]; then
       current_version="go"
@@ -158,5 +229,7 @@ function main() {
     run_command "$@"
   done
 }
+
+_on_change_init_epoch_source
 
 main "$@"

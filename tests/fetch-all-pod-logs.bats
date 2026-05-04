@@ -65,5 +65,7 @@ teardown() {
   run "$SCRIPT" -l 'app=x' -c 'sidecar'
   [ "$status" -eq 0 ]
   [ -f pod-a.sidecar.out ]
+  [ -f pod-b.sidecar.out ]
   grep -Fq 'logs pod-a --tail=10000 --timestamps -c sidecar' "$KUBECTL_LOG"
+  grep -Fq 'logs pod-b --tail=10000 --timestamps -c sidecar' "$KUBECTL_LOG"
 }

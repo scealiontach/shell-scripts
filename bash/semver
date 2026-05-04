@@ -387,7 +387,7 @@ function command-get() {
 
 case $# in
   0)
-    echo "Unknown command: $*"
+    printf '%s\n' "Unknown command: $*"
     usage-help
     ;;
 esac
@@ -415,7 +415,7 @@ case $1 in
     command-diff "$@"
     ;;
   *)
-    echo "Unknown arguments: $*"
+    printf '%s\n' "Unknown arguments: $*"
     usage-help
     ;;
 esac
