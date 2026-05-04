@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
+# Copyright © 2023 Kevin T. O'Donnell
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ------------------------------------------------------------------------------
+#
+# Derived from semver-tool (https://github.com/fsaintjacques/semver-tool);
+# vendored and extended in-tree for release automation.
 
 set -o errexit -o nounset -o pipefail
 
@@ -70,7 +87,7 @@ See also:
   https://semver.org -- Semantic Versioning 2.0.0"
 
 function error() {
-  echo -e "$1" >&2
+  printf '%s\n' "$1" >&2
   exit 1
 }
 
@@ -79,7 +96,7 @@ function usage-help() {
 }
 
 function usage-version() {
-  echo -e "${PROG}: $PROG_VERSION"
+  printf '%s\n' "${PROG}: $PROG_VERSION"
   exit 0
 }
 
@@ -370,14 +387,14 @@ function command-get() {
 
 case $# in
   0)
-    echo "Unknown command: $*"
+    printf '%s\n' "Unknown command: $*"
     usage-help
     ;;
 esac
 
 case $1 in
   --help | -h)
-    echo -e "$USAGE"
+    printf '%s\n' "$USAGE"
     exit 0
     ;;
   --version | -v) usage-version ;;
@@ -398,7 +415,7 @@ case $1 in
     command-diff "$@"
     ;;
   *)
-    echo "Unknown arguments: $*"
+    printf '%s\n' "Unknown arguments: $*"
     usage-help
     ;;
 esac
