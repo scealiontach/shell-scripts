@@ -7,6 +7,8 @@ setup() {
   load 'helpers.bash'
   helpers::isolate_home
   ONCHANGE="$REPO_ROOT/bash/on-change"
+  ONCHANGE_REAL_SLEEP=$(command -v sleep) || true
+  export ONCHANGE_REAL_SLEEP
 }
 
 @test "bare invocation prints syntax and exits 1" {
@@ -75,6 +77,7 @@ EOF
 }
 
 @test "SUR-2242: closed stdin throttles polling via sleep (no tight find loop)" {
+  [ -n "$ONCHANGE_REAL_SLEEP" ] || skip "sleep not on PATH"
   watch_dir=$(mktemp -d)
   touch "$watch_dir/seed"
   stub_bin=$(mktemp -d)
@@ -82,17 +85,112 @@ EOF
   cat >"$stub_bin/sleep" <<EOF
 #!/usr/bin/env bash
 printf 'x\n' >>"$sleep_log"
-exec /usr/bin/sleep "\$@"
+exec "$ONCHANGE_REAL_SLEEP" "\$@"
 EOF
   chmod +x "$stub_bin/sleep"
   (
-    /usr/bin/sleep 2
+    "$ONCHANGE_REAL_SLEEP" 2
     echo trig >>"$watch_dir/marker"
   ) &
   run env PATH="$stub_bin:$PATH" timeout 8s "$ONCHANGE" -W "$watch_dir" -w "$watch_dir" -t 1 -- true </dev/null
   rm -rf "$watch_dir" "$stub_bin"
   n_sleep=$(wc -l <"$sleep_log")
   rm -f "$sleep_log"
+  [ "$status" -eq 124 ]
   [ "$n_sleep" -ge 2 ]
   [ "$n_sleep" -le 12 ]
+}
+
+@test "SUR-2242: fractional -t with closed stdin does not emit arithmetic errors" {
+  watch_dir=$(mktemp -d)
+  touch "$watch_dir/seed"
+  (
+    sleep 0.3
+    echo trig >>"$watch_dir/marker"
+  ) &
+  run timeout 5s "$ONCHANGE" -W "$watch_dir" -w "$watch_dir" -t 1.5 -- true </dev/null 2>&1
+  rm -rf "$watch_dir"
+  [ "$status" -eq 124 ]
+  [[ "$output" != *syntax*error* ]]
+}
+
+@test "SUR-2242: fractional -t with open stdin does not double-sleep after read timeout" {
+  [ -n "$ONCHANGE_REAL_SLEEP" ] || skip "sleep not on PATH"
+  watch_dir=$(mktemp -d)
+  touch "$watch_dir/seed"
+  fifo_dir=$(mktemp -d)
+  fifo="$fifo_dir/pipe"
+  mkfifo "$fifo"
+  stub_bin=$(mktemp -d)
+  sleep_log=$(mktemp)
+  cat >"$stub_bin/sleep" <<EOF
+#!/usr/bin/env bash
+printf 'x\n' >>"$sleep_log"
+exec "$ONCHANGE_REAL_SLEEP" "\$@"
+EOF
+  chmod +x "$stub_bin/sleep"
+  # RDWR open: no peer needed; read -t blocks until timeout (no tight EOF).
+  # Use fd 4 — bats reserves 3 for its own I/O.
+  exec 4<>"$fifo"
+  run env PATH="$stub_bin:$PATH" timeout 6s "$ONCHANGE" -W "$watch_dir" -w "$watch_dir" -t 1.2 -- true <&4
+  exec 4>&- || true
+  n_sleep=$(wc -l <"$sleep_log")
+  rm -rf "$watch_dir" "$stub_bin" "$fifo_dir" "$sleep_log"
+  [ "$status" -eq 124 ]
+  [ "$n_sleep" -eq 0 ]
+}
+
+@test "SUR-2242: -t 0 with closed stdin throttles via sleep" {
+  [ -n "$ONCHANGE_REAL_SLEEP" ] || skip "sleep not on PATH"
+  watch_dir=$(mktemp -d)
+  touch "$watch_dir/seed"
+  stub_bin=$(mktemp -d)
+  sleep_log=$(mktemp)
+  cat >"$stub_bin/sleep" <<EOF
+#!/usr/bin/env bash
+printf 'x\n' >>"$sleep_log"
+exec "$ONCHANGE_REAL_SLEEP" "\$@"
+EOF
+  chmod +x "$stub_bin/sleep"
+  (
+    "$ONCHANGE_REAL_SLEEP" 2
+    echo trig >>"$watch_dir/marker"
+  ) &
+  run env PATH="$stub_bin:$PATH" timeout 5s "$ONCHANGE" -W "$watch_dir" -w "$watch_dir" -t 0 -- true </dev/null
+  rm -rf "$watch_dir" "$stub_bin"
+  n_sleep=$(wc -l <"$sleep_log")
+  rm -f "$sleep_log"
+  [ "$status" -eq 124 ]
+  [ "$n_sleep" -ge 1 ]
+}
+
+@test "SUR-2242: -t 0 with pipe stdin feeding lines does not throttle with sleep" {
+  [ -n "$ONCHANGE_REAL_SLEEP" ] || skip "sleep not on PATH"
+  watch_dir=$(mktemp -d)
+  touch "$watch_dir/seed"
+  stub_bin=$(mktemp -d)
+  sleep_log=$(mktemp)
+  cat >"$stub_bin/sleep" <<EOF
+#!/usr/bin/env bash
+printf 'x\n' >>"$sleep_log"
+exec "$ONCHANGE_REAL_SLEEP" "\$@"
+EOF
+  chmod +x "$stub_bin/sleep"
+  (
+    "$ONCHANGE_REAL_SLEEP" 2
+    echo trig >>"$watch_dir/marker"
+  ) &
+  # Inner bash -c expands watch_dir and ONCHANGE; outer single quotes are intentional.
+  # shellcheck disable=SC2016
+  run env PATH="$stub_bin:$PATH" ONCHANGE="$ONCHANGE" timeout 5s bash -c '
+    watch_dir="$1"
+    while true; do printf "%s\n" idle; done | "$ONCHANGE" -W "$watch_dir" -w "$watch_dir" -t 0 -- true
+  ' _ "$watch_dir"
+  rm -rf "$watch_dir" "$stub_bin"
+  n_sleep=$(wc -l <"$sleep_log")
+  rm -f "$sleep_log"
+  [ "$status" -eq 124 ]
+  [ "$n_sleep" -eq 0 ]
+  # Bash 3.2 rejects fractional read -t (would spam "invalid timeout specification").
+  [[ "$output" != *invalid*timeout* ]]
 }

@@ -22,6 +22,7 @@
 # shellcheck source=includer.sh
 source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
+@include commands
 @include error
 @include log
 @include options
@@ -43,6 +44,35 @@ fi
 
 WorkingDir=${WorkingDir:-$WatchDir}
 
+# Throttle logic compares fractional elapsed time in awk; fail at startup if missing.
+_awk=$(commands::use awk)
+
+# Seconds since epoch with fractional part when available (Bash 5.1+ EPOCHREALTIME,
+# else python3, else GNU date). Used so SUR-2242 can compare elapsed wall time to
+# fractional `read -t` without relying on `$SECONDS` (whole seconds only).
+function _on_change_monotonic_now() {
+  if [ "${BASH_VERSINFO[0]}" -gt 5 ] ||
+    { [ "${BASH_VERSINFO[0]}" -eq 5 ] && [ "${BASH_VERSINFO[1]}" -ge 1 ]; }; then
+    printf '%s\n' "${EPOCHREALTIME}"
+    return 0
+  fi
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import time; print(time.time())'
+    return 0
+  fi
+  local frac
+  frac=$(date +%s.%N 2>/dev/null) || frac=
+  case $frac in
+    *.*)
+      case ${frac##*.} in
+        '' | *[!0-9]*) printf '%s\n' "$(date +%s).0" ;;
+        *) printf '%s\n' "$frac" ;;
+      esac
+      ;;
+    *) printf '%s\n' "$(date +%s).0" ;;
+  esac
+}
+
 function wait_for_change() {
   local wait_time
   wait_time="${1:-3}"
@@ -56,15 +86,49 @@ function wait_for_change() {
   while [ "$start_version" = "$current_version" ]; do
     log::trace "Waiting $wait_time for changes"
     # When stdin is closed (e.g. /dev/null, CI), `read -t` fails immediately
-    # with status 1 and would tight-poll find|cksum. A timeout still waits the
-    # full interval and returns status >128 (SUR-2242); only throttle EOF-style
-    # failures.
-    read -r -t "$wait_time" cmd_input || {
-      local read_status=$?
-      if ((read_status <= 128)); then
-        sleep "$wait_time"
+    # and would tight-poll find|cksum. Throttle those with sleep (SUR-2242).
+    # Bash 4+ signals a timeout with exit status >128; Bash 3.2 uses status 1
+    # for both EOF and timeout, so compare elapsed wall time to `wait_time`
+    # (via _on_change_monotonic_now; `$SECONDS` is whole seconds and breaks
+    # fractional `-t`).  For non-TTY stdin and `-t 0`, the first `read -t 0` does
+    # not assign a line; it only reports whether input is available, and `/dev/null`
+    # still yields status 0. A follow-up `read -t` with a tiny timeout actually
+    # reads the line (or EOF), so throttle logic can treat real input like before
+    # SUR-2242 (SUR-2242 follow-up).  Bash 3.2 only accepts integer -t; use plain
+    # read after a successful -t 0 probe there instead of subsecond -t.
+    cmd_input=
+    local read_start read_end read_status
+    read_start=$(_on_change_monotonic_now)
+    if ! [ -t 0 ] &&
+      "$_awk" -v w="$wait_time" 'BEGIN { exit ((w + 0) == 0 ? 0 : 1) }'; then
+      read -r -t 0 _
+      read_status=$?
+      if [ "$read_status" -eq 0 ]; then
+        if [ "${BASH_VERSINFO[0]}" -ge 4 ]; then
+          read -r -t 0.01 cmd_input
+        else
+          read -r cmd_input
+        fi
+        read_status=$?
       fi
-    }
+    else
+      read -r -t "$wait_time" cmd_input
+      read_status=$?
+    fi
+    read_end=$(_on_change_monotonic_now)
+    if [ "$read_status" -gt 128 ]; then
+      true
+    elif ! [ -t 0 ] &&
+      "$_awk" -v w="$wait_time" 'BEGIN { exit ((w + 0) == 0 ? 0 : 1) }' &&
+      { [ "$read_status" -ne 0 ] || [ -z "$cmd_input" ]; }; then
+      sleep 1
+    elif [ "$read_status" -ne 0 ] &&
+      "$_awk" -v s="$read_start" -v e="$read_end" -v w="$wait_time" 'BEGIN {
+        if ((e - s) + 1e-9 < (w + 0)) exit 0
+        exit 1
+      }'; then
+      sleep "$wait_time"
+    fi
     if [ "$cmd_input" = "X" ]; then
       current_version="go"
     else

@@ -34,22 +34,24 @@ STUB
 
   export PATH="$STUB_BIN:$PATH"
   unset _kubectl _jq
+  FETCH_TEST_CWD=$(mktemp -d)
 }
 
 teardown() {
-  rm -rf "$STUB_BIN"
+  rm -rf "$STUB_BIN" "$FETCH_TEST_CWD"
   rm -f "$KUBECTL_LOG" "$JQ_ARGV_LOG"
 }
 
 @test "invokes kubectl get pods with -l selector and namespace" {
-  cd "$(mktemp -d)" || false
+  cd "$FETCH_TEST_CWD" || false
   run "$SCRIPT" -l 'app=myapp' -n 'ns-one'
   [ "$status" -eq 0 ]
   grep -Fq 'get pods -n ns-one -l app=myapp -o json' "$KUBECTL_LOG"
+  grep -Fq ".items[].metadata.name" "$JQ_ARGV_LOG"
 }
 
 @test "writes pod log files with .all suffix when -c is omitted" {
-  cd "$(mktemp -d)" || false
+  cd "$FETCH_TEST_CWD" || false
   run "$SCRIPT" -l 'role=worker'
   [ "$status" -eq 0 ]
   [ -f pod-a.all.out ]
@@ -59,7 +61,7 @@ teardown() {
 }
 
 @test "passes -c to kubectl logs and uses suffix in output filename" {
-  cd "$(mktemp -d)" || false
+  cd "$FETCH_TEST_CWD" || false
   run "$SCRIPT" -l 'app=x' -c 'sidecar'
   [ "$status" -eq 0 ]
   [ -f pod-a.sidecar.out ]
