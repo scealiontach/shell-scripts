@@ -64,12 +64,55 @@ teardown() {
   rm -f "$SSH_LOG"
 }
 
+# PATH without /usr/bin still needs core utilities used while sourcing libraries.
+populate_minimal_host_tools_bin() {
+  local mini_bin=${1:?}
+  mkdir -p "$mini_bin"
+  local tool_name
+  for tool_name in bash grep dirname basename cksum awk date; do
+    ln -sf "$(command -v "$tool_name")" "$mini_bin/$tool_name"
+  done
+}
+
 @test "local run logs bios and driver details for localhost" {
   run "$SCRIPT"
   [ "$status" -eq 0 ]
   [[ "$output" == *"host=localhost"* ]]
   [[ "$output" == *"bios vendor=StubVendor"* ]]
   [[ "$output" == *"version=9.8.7"* ]]
+  [[ "$output" == *"driver=ABC123DEV"* ]]
+}
+
+@test "local run finds dmidecode via fallback dir when not on PATH" {
+  local fake_sbin="$STUB_BIN/fallback_dmidecode"
+  local mini_bin="$STUB_BIN/mini_bin"
+  mkdir -p "$fake_sbin"
+  populate_minimal_host_tools_bin "$mini_bin"
+  cp "$TOOLS_STUB/dmidecode" "$fake_sbin/dmidecode"
+  chmod +x "$fake_sbin/dmidecode"
+  rm -f "$TOOLS_STUB/dmidecode"
+
+  # PATH must omit real /usr/bin/dmidecode so resolution exercises fallback dirs.
+  run env CHECK_SYSTEM_SBIN_FALLBACK_DIRS="$fake_sbin" \
+    PATH="$SSH_STUB:$TOOLS_STUB:$mini_bin" \
+    bash "$SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"bios vendor=StubVendor"* ]]
+}
+
+@test "local run finds lsmod via fallback dir when not on PATH" {
+  local fake_sbin="$STUB_BIN/fallback_lsmod"
+  local mini_bin="$STUB_BIN/mini_bin"
+  mkdir -p "$fake_sbin"
+  populate_minimal_host_tools_bin "$mini_bin"
+  cp "$TOOLS_STUB/lsmod" "$fake_sbin/lsmod"
+  chmod +x "$fake_sbin/lsmod"
+  rm -f "$TOOLS_STUB/lsmod"
+
+  run env CHECK_SYSTEM_SBIN_FALLBACK_DIRS="$fake_sbin" \
+    PATH="$SSH_STUB:$TOOLS_STUB:$mini_bin" \
+    bash "$SCRIPT"
+  [ "$status" -eq 0 ]
   [[ "$output" == *"driver=ABC123DEV"* ]]
 }
 

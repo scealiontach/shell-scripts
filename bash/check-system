@@ -34,8 +34,32 @@ shift $((OPTIND - 1))
 _driver=(modinfo isgx --field=srcversion)
 
 if [ "$USE_SSH" != "true" ]; then
-  _dmidecode=("$(commands::use dmidecode)")
-  _lsmod=("$(commands::use lsmod)")
+  # Prefer PATH (Nix, non-FHS) then typical FHS admin locations when PATH is
+  # stripped (e.g. non-login shells, Docker). Tests may set
+  # CHECK_SYSTEM_SBIN_FALLBACK_DIRS to a space-separated directory list.
+  _check_system_sbin_fallback_dirs=()
+  read -r -a _check_system_sbin_fallback_dirs <<<"${CHECK_SYSTEM_SBIN_FALLBACK_DIRS:-/sbin /usr/sbin}"
+
+  function resolve_admin_tool() {
+    local name=${1:?}
+    local path
+    path=$(command -v "$name" 2>/dev/null) || true
+    if [ -n "$path" ]; then
+      printf '%s\n' "$path"
+      return 0
+    fi
+    local dir
+    for dir in "${_check_system_sbin_fallback_dirs[@]}"; do
+      if [ -x "$dir/$name" ]; then
+        printf '%s\n' "$dir/$name"
+        return 0
+      fi
+    done
+    commands::err_not_found "$name"
+  }
+
+  _dmidecode=("$(resolve_admin_tool dmidecode)")
+  _lsmod=("$(resolve_admin_tool lsmod)")
   vendor_cmd=("${_dmidecode[@]}" -s bios-vendor)
   version_cmd=("${_dmidecode[@]}" -s bios-version)
   release_cmd=("${_dmidecode[@]}" -s bios-release-date)
