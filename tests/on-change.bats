@@ -73,3 +73,26 @@ EOF
   rm -rf "$watch_dir" "$stub_bin"
   rm -f "$argv_log"
 }
+
+@test "SUR-2242: closed stdin throttles polling via sleep (no tight find loop)" {
+  watch_dir=$(mktemp -d)
+  touch "$watch_dir/seed"
+  stub_bin=$(mktemp -d)
+  sleep_log=$(mktemp)
+  cat >"$stub_bin/sleep" <<EOF
+#!/usr/bin/env bash
+printf 'x\n' >>"$sleep_log"
+exec /usr/bin/sleep "\$@"
+EOF
+  chmod +x "$stub_bin/sleep"
+  (
+    /usr/bin/sleep 2
+    echo trig >>"$watch_dir/marker"
+  ) &
+  run env PATH="$stub_bin:$PATH" timeout 8s "$ONCHANGE" -W "$watch_dir" -w "$watch_dir" -t 1 -- true </dev/null
+  rm -rf "$watch_dir" "$stub_bin"
+  n_sleep=$(wc -l <"$sleep_log")
+  rm -f "$sleep_log"
+  [ "$n_sleep" -ge 2 ]
+  [ "$n_sleep" -le 12 ]
+}

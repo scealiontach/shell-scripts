@@ -55,7 +55,16 @@ function wait_for_change() {
   local cmd_input
   while [ "$start_version" = "$current_version" ]; do
     log::trace "Waiting $wait_time for changes"
-    read -r -t "$wait_time" cmd_input
+    # When stdin is closed (e.g. /dev/null, CI), `read -t` fails immediately
+    # with status 1 and would tight-poll find|cksum. A timeout still waits the
+    # full interval and returns status >128 (SUR-2242); only throttle EOF-style
+    # failures.
+    read -r -t "$wait_time" cmd_input || {
+      local read_status=$?
+      if ((read_status <= 128)); then
+        sleep "$wait_time"
+      fi
+    }
     if [ "$cmd_input" = "X" ]; then
       current_version="go"
     else
