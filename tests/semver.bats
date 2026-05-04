@@ -113,6 +113,12 @@ setup() {
 
 # ---------- help ------------------------------------------------------------
 
+@test "--version prints program line (SUR-2251)" {
+  run "$SEMVER" --version
+  [ "$status" -eq 0 ]
+  [ "$output" = "semver: 3.1.0" ]
+}
+
 @test "--help USAGE block lists the diff subcommand (SUR-1878)" {
   run "$SEMVER" --help
   [ "$status" -eq 0 ]

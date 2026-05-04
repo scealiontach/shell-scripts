@@ -7,9 +7,12 @@ setup() {
   export LOGFILE_DISABLE=true LOG_LEVEL=2
   SCRIPT="$REPO_ROOT/bash/check-system"
   STUB_BIN=$(mktemp -d)
+  TOOLS_STUB="$STUB_BIN/tools"
+  SSH_STUB="$STUB_BIN/sshonly"
+  mkdir -p "$TOOLS_STUB" "$SSH_STUB"
   SSH_LOG=$(mktemp)
 
-  cat >"$STUB_BIN/dmidecode" <<'STUB'
+  cat >"$TOOLS_STUB/dmidecode" <<'STUB'
 #!/usr/bin/env bash
 case "$*" in
   *bios-vendor*) echo "StubVendor" ;;
@@ -18,23 +21,23 @@ case "$*" in
   *) echo "unknown"; exit 1 ;;
 esac
 STUB
-  chmod +x "$STUB_BIN/dmidecode"
+  chmod +x "$TOOLS_STUB/dmidecode"
 
-  cat >"$STUB_BIN/lsmod" <<'STUB'
+  cat >"$TOOLS_STUB/lsmod" <<'STUB'
 #!/usr/bin/env bash
 echo "Module                  Size  Used by"
 echo "isgx                  40960  0"
 STUB
-  chmod +x "$STUB_BIN/lsmod"
+  chmod +x "$TOOLS_STUB/lsmod"
 
-  cat >"$STUB_BIN/modinfo" <<'STUB'
+  cat >"$TOOLS_STUB/modinfo" <<'STUB'
 #!/usr/bin/env bash
 # Real modinfo --field=srcversion prints the value only.
 echo "ABC123DEV"
 STUB
-  chmod +x "$STUB_BIN/modinfo"
+  chmod +x "$TOOLS_STUB/modinfo"
 
-  cat >"$STUB_BIN/ssh" <<STUB
+  cat >"$SSH_STUB/ssh" <<STUB
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >>"$SSH_LOG"
 remote="\${*: -1}"
@@ -50,9 +53,9 @@ case "\$remote" in
   *) echo "bad-remote" >&2; exit 1 ;;
 esac
 STUB
-  chmod +x "$STUB_BIN/ssh"
+  chmod +x "$SSH_STUB/ssh"
 
-  export PATH="$STUB_BIN:$PATH"
+  export PATH="$SSH_STUB:$TOOLS_STUB:$PATH"
   unset _ssh _dmidecode _lsmod _modinfo
 }
 
@@ -71,12 +74,12 @@ teardown() {
 }
 
 @test "local run without isgx reports driver as (none)" {
-  cat >"$STUB_BIN/lsmod" <<'STUB'
+  cat >"$TOOLS_STUB/lsmod" <<'STUB'
 #!/usr/bin/env bash
 echo "Module                  Size  Used by"
 echo "nf_conntrack          99999  0"
 STUB
-  chmod +x "$STUB_BIN/lsmod"
+  chmod +x "$TOOLS_STUB/lsmod"
 
   run "$SCRIPT"
   [ "$status" -eq 0 ]
@@ -92,4 +95,10 @@ STUB
   [[ "$output" == *"bios vendor=RemoteVendor"* ]]
   grep -Fq 'edge-one' "$SSH_LOG"
   grep -Fq 'edge-two' "$SSH_LOG"
+  # Remote payload must use bare tool names, not local PATH stubs under TOOLS_STUB.
+  run grep -Fq "$TOOLS_STUB" "$SSH_LOG"
+  [ "$status" -ne 0 ]
+  grep -Fq 'dmidecode -s bios-vendor' "$SSH_LOG"
+  grep -Fq 'lsmod' "$SSH_LOG"
+  grep -Fq 'modinfo isgx' "$SSH_LOG"
 }

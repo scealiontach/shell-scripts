@@ -31,17 +31,16 @@ options::add -o s -d "use ssh" -x USE_SSH
 options::parse_available "$@"
 shift $((OPTIND - 1))
 
-_dmidecode=("$(commands::use dmidecode)")
-_lsmod=("$(commands::use lsmod)")
 _driver=(modinfo isgx --field=srcversion)
 
-vendor_cmd=("${_dmidecode[@]}" -s bios-vendor)
-version_cmd=("${_dmidecode[@]}" -s bios-version)
-release_cmd=("${_dmidecode[@]}" -s bios-release-date)
-lsmod_cmd=("${_lsmod[@]}")
-driver_cmd=("${_driver[@]}")
-
 if [ "$USE_SSH" != "true" ]; then
+  _dmidecode=("$(commands::use dmidecode)")
+  _lsmod=("$(commands::use lsmod)")
+  vendor_cmd=("${_dmidecode[@]}" -s bios-vendor)
+  version_cmd=("${_dmidecode[@]}" -s bios-version)
+  release_cmd=("${_dmidecode[@]}" -s bios-release-date)
+  lsmod_cmd=("${_lsmod[@]}")
+  driver_cmd=("${_driver[@]}")
   _cmd_prefix=()
   if [ "$USE_SUDO" = "true" ]; then
     _cmd_prefix=(sudo -S)
@@ -70,6 +69,14 @@ if [ "$USE_SSH" != "true" ]; then
 
   log::info "host=localhost bios vendor=${vendor} version=${version} release=${release} driver=${driver}"
 else
+  # Remote commands use bare tool names so the remote shell resolves PATH on
+  # the target host. Local `command -v` paths must not be embedded here.
+  vendor_cmd=(dmidecode -s bios-vendor)
+  version_cmd=(dmidecode -s bios-version)
+  release_cmd=(dmidecode -s bios-release-date)
+  lsmod_cmd=(lsmod)
+  driver_cmd=("${_driver[@]}")
+
   # Build a single shell-quoted remote command string and pass it as one
   # argument to ssh (or to `sudo -S bash -c`). The remote login shell
   # re-tokenises it with the original boundaries preserved by printf %q.
