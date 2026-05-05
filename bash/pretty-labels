@@ -27,7 +27,7 @@ options::add -o t -d "resource type to examine" -a -m -e RESOURCE_TYPE
 options::parse "$@"
 shift $((OPTIND - 1))
 
-for line in $(k8s::ctl get "$RESOURCE_TYPE" --show-labels "$@" | awk '{print $1":"$NF}'); do
+for line in $(k8s::ctl get "$RESOURCE_TYPE" --show-labels --no-headers "$@" | awk '{print $1":"$NF}'); do
   resource_name=$(echo "$line" | awk -F: '{print $1}')
   labels=$(echo "$line" | awk -F: '{print $NF}')
   col1="$resource_name"
