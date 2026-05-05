@@ -20,11 +20,6 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 @include options
 @include docker
 
-log::level 2
-function usage() {
-  true
-}
-
 additional_registries=()
 function _add_additional_registry {
   local registry=${1:?}
