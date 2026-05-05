@@ -136,12 +136,29 @@ if [ -n "$FROM_DATE" ]; then
 fi
 
 if [ -n "$FROM_DATE" ] || [ -n "$TO_DATE" ]; then
-  if [ -z "$to_commit" ]; then
-    echo "No change history in the requested range"
+  # SUR-2327: distinguish "flag not passed" from "flag passed but date
+  # matched no commit". The latter must NOT silently fall through to a
+  # default endpoint — that would expand the range to the opposite of
+  # what the user asked for (e.g. -t 1900-01-01 dumping full history).
+  if [ -n "$TO_DATE" ] && [ -z "$to_commit" ]; then
+    echo "No commits before $TO_DATE"
     exit 0
-  else
-    ::fromto "$from_commit" "$to_commit"
   fi
+  if [ -n "$FROM_DATE" ] && [ -z "$from_commit" ]; then
+    echo "No commits on or after $FROM_DATE"
+    exit 0
+  fi
+  # SUR-2327: default each missing endpoint so -f and -t can be used
+  # independently. Pre-fix, -f alone hit the "No change history" branch
+  # (to_commit empty) and -t alone tripped ::fromto's `${1:?}` because
+  # from_commit was empty.
+  if [ -z "$to_commit" ]; then
+    to_commit=HEAD
+  fi
+  if [ -z "$from_commit" ]; then
+    from_commit=$(git::cmd rev-list --max-parents=0 HEAD | tail -n 1)
+  fi
+  ::fromto "$from_commit" "$to_commit"
 else
   ::full
 fi

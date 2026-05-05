@@ -97,3 +97,66 @@ setup() {
   "
   [ "$status" -ne 0 ]
 }
+
+# SUR-2324: secret::_install_cleanup_trap must chain (not clobber) any
+# caller-installed EXIT trap. Pre-fix, the unconditional
+# `trap 'secret::clear' EXIT INT TERM` overwrote the caller's trap and
+# the caller's cleanup never fired, leaking resources.
+@test "secret::register_env preserves caller's pre-existing EXIT trap (SUR-2324)" {
+  SENTINEL="$BATS_TEST_TMPDIR/exit-sentinel"
+  TMPFILE_PROBE="$BATS_TEST_TMPDIR/tmpfile-probe"
+  rm -f "$SENTINEL" "$TMPFILE_PROBE"
+  # secret::as_file must run in the outer shell (not via $()) so the
+  # tempfile path lands in SECRET_TMPFILES of the same shell whose EXIT
+  # trap will later run secret::clear. We redirect stdout to a probe file
+  # so the test can read the path after the subshell exits.
+  bash -c "
+    trap 'touch \"$SENTINEL\"' EXIT
+    MY_SECRET=hunter2
+    source '$REPO_ROOT/bash/includer.sh'
+    @include secret
+    secret::register_env MY_SECRET
+    secret::as_file MY_SECRET 2>/dev/null >'$TMPFILE_PROBE'
+  "
+  # Caller's EXIT trap fired (sentinel created).
+  [ -f "$SENTINEL" ]
+  # secret::clear also ran (the tempfile is gone).
+  tf=$(cat "$TMPFILE_PROBE")
+  [ -n "$tf" ]
+  [ ! -e "$tf" ]
+}
+
+# SUR-2324: caller-trap commands containing single quotes are escaped by
+# `trap -p` as '\''; the chained-trap eval must unescape them correctly.
+@test "secret::_install_cleanup_trap survives a caller trap with embedded single quotes (SUR-2324)" {
+  SENTINEL="$BATS_TEST_TMPDIR/quoted-sentinel"
+  rm -f "$SENTINEL"
+  bash -c "
+    trap 'echo '\\''quoted-trap-fired'\\'' >\"$SENTINEL\"' EXIT
+    MY_SECRET=hunter2
+    source '$REPO_ROOT/bash/includer.sh'
+    @include secret
+    secret::register_env MY_SECRET
+  "
+  [ -f "$SENTINEL" ]
+  out=$(cat "$SENTINEL")
+  [ "$out" = "quoted-trap-fired" ]
+}
+
+# SUR-2324: idempotency — installing twice must not stack chained calls.
+@test "secret::_install_cleanup_trap is idempotent within a shell (SUR-2324)" {
+  SENTINEL="$BATS_TEST_TMPDIR/idempotent-sentinel"
+  rm -f "$SENTINEL"
+  bash -c "
+    trap 'printf x >>\"$SENTINEL\"' EXIT
+    MY_SECRET=hunter2
+    OTHER_SECRET=passw0rd
+    source '$REPO_ROOT/bash/includer.sh'
+    @include secret
+    secret::register_env MY_SECRET
+    secret::register_env OTHER_SECRET
+  "
+  # Caller's trap should fire exactly once on shell exit.
+  out=$(cat "$SENTINEL")
+  [ "$out" = "x" ]
+}

@@ -28,13 +28,50 @@ declare -g -A SECRETS
 declare -g -A SECRETS_FILES
 declare -g -a SECRET_TMPFILES
 declare -g SECRET_TRAP_INSTALLED=${SECRET_TRAP_INSTALLED:-false}
+declare -g SECRET_PREV_EXIT_TRAP=""
+declare -g SECRET_PREV_INT_TRAP=""
+declare -g SECRET_PREV_TERM_TRAP=""
+
+function secret::_run_chained_trap {
+  @doc Internal - run secret::clear and afterwards run the caller \
+    pre-existing trap captured at install time for the given signal.
+  @arg _1_ signal name EXIT INT or TERM
+  local sig=${1:?}
+  secret::clear
+  local prev=
+  case "$sig" in
+    EXIT) prev=$SECRET_PREV_EXIT_TRAP ;;
+    INT) prev=$SECRET_PREV_INT_TRAP ;;
+    TERM) prev=$SECRET_PREV_TERM_TRAP ;;
+    *) return ;;
+  esac
+  if [ -n "$prev" ]; then
+    # trap -p SIG returns the literal text:
+    #   trap -- <single-quoted-CMD> SIG
+    # Strip the wrapper, then unquote the CMD via eval-set-positional-args
+    # so embedded single quotes (escaped by bash as the standard
+    # close/escape/reopen sequence) round-trip cleanly.
+    local cmd_quoted=${prev#trap -- }
+    cmd_quoted=${cmd_quoted% "$sig"}
+    eval "set -- $cmd_quoted"
+    eval "$1"
+  fi
+}
 
 function secret::_install_cleanup_trap {
   @doc Internal - install the EXIT/INT/TERM trap that calls secret::clear \
     exactly once per shell. Must be invoked from the parent shell scope so \
-    the trap is in the right place. The registration helpers call this.
+    the trap is in the right place. The registration helpers call this. \
+    SUR-2324: captures any pre-existing caller trap on EXIT/INT/TERM so the \
+    chained handler runs the caller pre-existing trap after secret::clear \
+    instead of silently overwriting it.
   if [ "$SECRET_TRAP_INSTALLED" != "true" ]; then
-    trap 'secret::clear' EXIT INT TERM
+    SECRET_PREV_EXIT_TRAP=$(trap -p EXIT)
+    SECRET_PREV_INT_TRAP=$(trap -p INT)
+    SECRET_PREV_TERM_TRAP=$(trap -p TERM)
+    trap 'secret::_run_chained_trap EXIT' EXIT
+    trap 'secret::_run_chained_trap INT' INT
+    trap 'secret::_run_chained_trap TERM' TERM
     SECRET_TRAP_INSTALLED=true
   fi
 }
