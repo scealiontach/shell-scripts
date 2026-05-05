@@ -223,6 +223,7 @@ function update_kubectl {
     echo "update_kubectl: SHA-256 verification failed" >&2
     return 1
   fi
+  mkdir -p "$HOME/.local/bin"
   install -m 0755 "$tmpdir/kubectl" "$HOME/.local/bin/kubectl"
 }
 
