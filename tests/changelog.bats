@@ -88,6 +88,30 @@ teardown() {
   [ "$trailing" -eq 1 ]
 }
 
+# SUR-2327: -f and -t are documented as independent. Pre-fix, -f alone
+# printed "No change history in the requested range" and -t alone hit
+# ::fromto's `${1:?}` because from_commit was empty.
+@test "changelog -f <past-date> alone produces a non-empty range up to HEAD (SUR-2327)" {
+  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -f 1970-01-01"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"feat: post-tag change"* ]]
+  [[ "$output" != *"No change history in the requested range"* ]]
+}
+
+@test "changelog -t <future-date> alone produces a non-empty range from repo root (SUR-2327)" {
+  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -t 2999-01-01"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"feat: post-tag change"* ]]
+  [[ "$output" != *"No change history in the requested range"* ]]
+}
+
+@test "changelog -f and -t together produce a bounded range (SUR-2327)" {
+  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -f 1970-01-01 -t 2999-01-01"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"feat: post-tag change"* ]]
+  [[ "$output" != *"No change history in the requested range"* ]]
+}
+
 # SUR-1939: count::fromto invocations to guarantee we don't run twice
 # per tag iteration. We instrument by sourcing `bash/changelog`'s
 # ::full + ::fromto definitions in a sub-shell that wraps ::fromto in

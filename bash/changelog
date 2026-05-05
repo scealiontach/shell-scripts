@@ -136,12 +136,17 @@ if [ -n "$FROM_DATE" ]; then
 fi
 
 if [ -n "$FROM_DATE" ] || [ -n "$TO_DATE" ]; then
+  # SUR-2327: default each missing endpoint so -f and -t can be used
+  # independently. Pre-fix, -f alone hit the "No change history" branch
+  # (to_commit empty) and -t alone tripped ::fromto's `${1:?}` because
+  # from_commit was empty.
   if [ -z "$to_commit" ]; then
-    echo "No change history in the requested range"
-    exit 0
-  else
-    ::fromto "$from_commit" "$to_commit"
+    to_commit=HEAD
   fi
+  if [ -z "$from_commit" ]; then
+    from_commit=$(git::cmd rev-list --max-parents=0 HEAD | tail -n 1)
+  fi
+  ::fromto "$from_commit" "$to_commit"
 else
   ::full
 fi
