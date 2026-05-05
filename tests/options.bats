@@ -98,7 +98,7 @@ setup() {
     NO_SYNTAX_EXIT=1 options::parse_available
   "
   [ "$status" -ne 0 ]
-  [[ "$output" == *"Missing required option"* ]] || [[ "$output" == *"-l"* ]]
+  [[ "$output" == *"Missing required option: -l"* ]]
 }
 
 @test "options::parse_available fails when mandatory option argument is empty (SUR-2322)" {
@@ -110,5 +110,5 @@ setup() {
     NO_SYNTAX_EXIT=1 options::parse_available -l ''
   "
   [ "$status" -ne 0 ]
-  [[ "$output" == *"empty"* ]] || [[ "$output" == *"-l"* ]]
+  [[ "$output" == *"Required option -l cannot be empty"* ]]
 }

@@ -47,10 +47,10 @@ for d in "$TARGET_DIR"/*; do
       continue
     fi
     if [ "$NEW_BRANCH" = "true" ]; then
-      if exec::capture git::cmd checkout -b "$BRANCH" "$@"; then
+      if _new_branch_err=$(git::cmd checkout -b "$BRANCH" "$@" 2>&1); then
         log::info "Checked out into new branch $BRANCH in $d"
       else
-        log::warn "Failed to create new branch $BRANCH in $d (see exec log); not falling back to checkout of an existing branch"
+        log::warn "Failed to create new branch $BRANCH in $d — $_new_branch_err; not falling back to checkout of an existing branch"
       fi
     elif exec::hide git::cmd checkout "$BRANCH" "$@"; then
       log::info "Checked out $BRANCH in $d"

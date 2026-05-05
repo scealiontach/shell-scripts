@@ -42,10 +42,11 @@ setup() {
 
 @test "switch-to-branch -n does not checkout existing branch when create fails (SUR-2334)" {
   git -C "$HOME/git/myorg/repo1" branch -f sur2334-newb main >/dev/null
-  run env LOGFILE_DISABLE=true "$SWITCH" -o myorg -n -b sur2334-newb
+  run "$SWITCH" -o myorg -n -b sur2334-newb -v
   [ "$status" -eq 0 ]
   branch1=$(git -C "$HOME/git/myorg/repo1" rev-parse --abbrev-ref HEAD)
   [ "$branch1" = "main" ]
-  [[ "$output" == *"Failed to create new branch sur2334-newb"* ]] ||
-    [[ "$output" == *"already exists"* ]]
+  [[ "$output" == *"Failed to create new branch sur2334-newb"* ]]
+  [ ! -f "$HOME/git/myorg/repo1/exec.log" ]
+  [ ! -f "$HOME/git/myorg/repo2/exec.log" ]
 }
