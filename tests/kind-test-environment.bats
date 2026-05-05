@@ -28,7 +28,7 @@ teardown() {
     "HELM_ARGV_LOG=$HELM_ARGV_LOG" \
     "KIND_TEST_ENVIRONMENT_SOURCE_ONLY=true" \
     bash -c "
-      source '$REPO_ROOT/bash/kind-test-environment' -c create
+      source '$REPO_ROOT/bash/kind-test-environment' -c create -f /dev/null
       # Reset after source so the script's own repo defaults don't
       # contaminate the test's controlled list.
       ADD_HELM_REPOS=(
@@ -71,7 +71,7 @@ STUB_EOF
     "PATH=$PATH" \
     "KIND_TEST_ENVIRONMENT_SOURCE_ONLY=true" \
     bash -c "
-      source '$REPO_ROOT/bash/kind-test-environment' -c create
+      source '$REPO_ROOT/bash/kind-test-environment' -c create -f /dev/null
       ::asdf kind
       [ -z \"\${_asdf:-}\" ]  || { echo '_asdf leaked' >&2; exit 1; }
       [ -z \"\${_where:-}\" ] || { echo '_where leaked' >&2; exit 1; }

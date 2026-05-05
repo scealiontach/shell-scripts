@@ -33,7 +33,7 @@ options::description "A makeshift minimal CI system. It watches a directory for\
 working directory. While running, type X<Enter> on stdin to force an immediate\
  re-run without waiting for a filesystem change."
 options::add -o W -d "directory to watch for changes" -a -m -e WatchDir
-options::add -o w -d "working directory" -a -m -e WorkingDir
+options::add -o w -d "working directory (defaults to watch directory)" -a -e WorkingDir
 options::add -o t -d "interval to check for changes" -a -m -e WaitTime
 options::parse "$@"
 shift "$((OPTIND - 1))"

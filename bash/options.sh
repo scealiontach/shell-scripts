@@ -29,7 +29,29 @@ declare -g -A OPTIONS_OPTIONAL
 declare -g -A OPTIONS_HAS_ARGS
 declare -g -A OPTIONS_PARSE_FUNCS
 declare -g -A OPTIONS_ENVIRONMENT
+declare -g -A OPTIONS_SEEN
 declare -g OPTIONS_DESCRIPTION
+
+function options::_mandatory_options_validate() {
+  local opt
+  local varName
+  for opt in "${OPTIONS[@]}"; do
+    [ "${OPTIONS_OPTIONAL[$opt]}" = "true" ] && continue
+    if [ "${OPTIONS_SEEN[$opt]:-0}" != "1" ]; then
+      log::error "Missing required option: -$opt"
+      options::syntax_exit
+    fi
+    if [ "${OPTIONS_HAS_ARGS[$opt]}" = "true" ]; then
+      varName="${OPTIONS_ENVIRONMENT[$opt]:-}"
+      if [ -n "$varName" ]; then
+        if [ -z "${!varName}" ]; then
+          log::error "Required option -$opt cannot be empty"
+          options::syntax_exit
+        fi
+      fi
+    fi
+  done
+}
 
 function options::syntax_exit() {
   @doc Print the command syntax and exit
@@ -49,6 +71,7 @@ function options::clear() {
   OPTIONS_HAS_ARGS=()
   OPTIONS_PARSE_FUNCS=()
   OPTIONS_ENVIRONMENT=()
+  OPTIONS_SEEN=()
   OPTIONS_DESCRIPTION=""
   options::add -o h -d "prints syntax and exits" -f options::syntax_exit &&
     HELP_OPT_ADDED="true"
@@ -242,20 +265,34 @@ function options::standard() {
 function options::parse_available() {
   @doc parse the options using the provided argument array
   @arg "$@" the provided argument array
+  OPTIONS_SEEN=()
   while options::getopts opt "$@"; do
     if [ "$opt" != "?" ]; then
+      OPTIONS_SEEN[$opt]=1
       if [ -n "${OPTIONS_ENVIRONMENT[$opt]}" ]; then
         local varName="${OPTIONS_ENVIRONMENT[$opt]}"
         local val
-        if [ -n "${OPTARG}" ]; then
+        if [ "${OPTIONS_HAS_ARGS[$opt]}" = "true" ]; then
+          val="${OPTARG-}"
+          if [ "${OPTIONS_OPTIONAL[$opt]}" != "true" ] && [ -z "$val" ]; then
+            log::error "Required option -$opt cannot be empty"
+            options::syntax_exit
+          fi
+        elif [ -n "${OPTARG}" ]; then
           val="${OPTARG}"
         else
           val="true"
         fi
         declare -g "$varName=${val}"
       elif [ -n "${OPTIONS_PARSE_FUNCS[$opt]}" ]; then
+        if [ "${OPTIONS_OPTIONAL[$opt]}" != "true" ] &&
+          [ "${OPTIONS_HAS_ARGS[$opt]}" = "true" ] &&
+          [ -z "${OPTARG-}" ]; then
+          log::error "Required option -$opt cannot be empty"
+          options::syntax_exit
+        fi
         if command -v "${OPTIONS_PARSE_FUNCS[$opt]}" >/dev/null; then
-          ${OPTIONS_PARSE_FUNCS[$opt]} "${OPTARG}"
+          ${OPTIONS_PARSE_FUNCS[$opt]} "${OPTARG-}"
         else
           echo "ERROR: for option ($opt) parse_functions must be defined or left out"
           exit 1
@@ -265,6 +302,7 @@ function options::parse_available() {
       return 1
     fi
   done
+  options::_mandatory_options_validate
 }
 
 function options::parse() {
