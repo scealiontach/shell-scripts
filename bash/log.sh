@@ -227,10 +227,13 @@ function log::_format() {
   local date
   date="$(date "$LOG_DATE_FORMAT")"
   local formatted_log="$LOG_FORMAT"
-  formatted_log="${formatted_log/'%MESSAGE'/$log}"
+  # SUR-2331: substitute %MESSAGE last so any literal %LEVEL/%PID/%DATE
+  # text inside the user-supplied message does not get re-interpreted by
+  # the subsequent substitutions.
   formatted_log="${formatted_log/'%LEVEL'/$level}"
   formatted_log="${formatted_log/'%PID'/$pid}"
   formatted_log="${formatted_log/'%DATE'/$date}"
+  formatted_log="${formatted_log/'%MESSAGE'/$log}"
   printf '%s\n' "$formatted_log"
 }
 # Deprecated public name retained as a parens-only shim so the bare identifier

@@ -156,3 +156,39 @@ probe_level() {
   ")
   [[ "$out" == "TRACE=true DEBUG=true INFO=false WARNING=false" ]]
 }
+
+# SUR-2331: log::_format substitutes %MESSAGE last so a literal
+# placeholder inside the user-supplied message survives without being
+# re-interpreted by the subsequent %LEVEL/%PID/%DATE substitutions.
+@test "log::_format does not re-interpret %LEVEL inside the message (SUR-2331)" {
+  out=$(bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    LOG_FORMAT='%LEVEL %MESSAGE'
+    log::_format INFO 'literal %LEVEL'
+  ")
+  # The level is INFO and the message contains the literal token %LEVEL.
+  # Pre-fix the output was 'INFO INFO literal INFO' — message substituted
+  # first, then the %LEVEL inside the message got re-substituted.
+  [[ "$out" == "INFO literal %LEVEL" ]]
+}
+
+@test "log::_format does not re-interpret %PID inside the message (SUR-2331)" {
+  out=$(bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    LOG_FORMAT='%LEVEL %MESSAGE'
+    log::_format INFO 'pid=%PID'
+  ")
+  [[ "$out" == "INFO pid=%PID" ]]
+}
+
+@test "log::_format does not re-interpret %DATE inside the message (SUR-2331)" {
+  out=$(bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    LOG_FORMAT='%LEVEL %MESSAGE'
+    log::_format INFO 'date=%DATE'
+  ")
+  [[ "$out" == "INFO date=%DATE" ]]
+}
