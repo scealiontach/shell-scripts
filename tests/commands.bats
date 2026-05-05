@@ -32,3 +32,76 @@ setup() {
   "
   [ "$status" -ne 0 ]
 }
+
+# SUR-2342: bash variable names reject hyphens and dots, so the cache-key
+# variable name must be sanitised. Pre-fix, `commands::use ssh-keygen`
+# crashed with `declare: '_ssh-keygen=...': not a valid identifier`.
+@test "commands::use resolves a hyphenated command name (SUR-2342)" {
+  STUB_BIN=$(mktemp -d)
+  cat >"$STUB_BIN/ssh-keygen" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$STUB_BIN/ssh-keygen"
+  out=$(mktemp)
+  run env "PATH=$STUB_BIN:$PATH" bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include commands
+    commands::use ssh-keygen >'$out'
+  "
+  rm -rf "$STUB_BIN"
+  [ "$status" -eq 0 ]
+  resolved=$(cat "$out")
+  rm -f "$out"
+  [[ "$resolved" == */ssh-keygen ]]
+}
+
+@test "commands::use resolves a dotted command name (SUR-2342)" {
+  STUB_BIN=$(mktemp -d)
+  cat >"$STUB_BIN/python3.12" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$STUB_BIN/python3.12"
+  out=$(mktemp)
+  run env "PATH=$STUB_BIN:$PATH" bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include commands
+    commands::use python3.12 >'$out'
+  "
+  rm -rf "$STUB_BIN"
+  [ "$status" -eq 0 ]
+  resolved=$(cat "$out")
+  rm -f "$out"
+  [[ "$resolved" == */python3.12 ]]
+}
+
+@test "commands::use caches under sanitised key and survives binary removal (SUR-2342)" {
+  # First call resolves and caches under _ssh_keygen. After the stub is
+  # deleted, a second call must still return the cached path rather than
+  # re-resolving. $() is a subshell so we redirect to a tempfile to keep
+  # the declare -g cache write in the same shell.
+  STUB_BIN=$(mktemp -d)
+  cat >"$STUB_BIN/ssh-keygen" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$STUB_BIN/ssh-keygen"
+  first="$BATS_TEST_TMPDIR/first"
+  second="$BATS_TEST_TMPDIR/second"
+  rm -f "$first" "$second"
+  run env "PATH=$STUB_BIN:$PATH" bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include commands
+    commands::use ssh-keygen >'$first'
+    rm -f '$STUB_BIN/ssh-keygen'
+    commands::use ssh-keygen >'$second'
+    [ \"\$_ssh_keygen\" = \"\$(cat '$first')\" ] || { echo 'cache key mismatch' >&2; exit 1; }
+  "
+  rm -rf "$STUB_BIN"
+  [ "$status" -eq 0 ]
+  p1=$(cat "$first")
+  p2=$(cat "$second")
+  [ "$p1" = "$p2" ]
+  [[ "$p1" == */ssh-keygen ]]
+}

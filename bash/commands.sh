@@ -34,7 +34,13 @@ function commands::use {
   @doc Find the specified command on the PATH if available or error
   @arg _1_ the base command name to find
   local cmd=${1:?}
-  local var=_${cmd}
+  # Cache-key sanitisation: bash variable names cannot contain hyphens or
+  # dots, so commands like ssh-keygen or python3.12 must be remapped to
+  # _ssh_keygen / _python3_12 for the declare -g call. The lookup itself
+  # below keeps the original $cmd. Distinct names that collide after
+  # sanitisation (foo-bar vs foo_bar) would share a cache slot, but that
+  # is vanishingly unlikely on a real PATH.
+  local var=_${cmd//[^A-Za-z0-9_]/_}
   if [ -z "${!var}" ]; then
     local cmd_path
     cmd_path=$(command -v "$cmd") || commands::err_not_found "$cmd"
