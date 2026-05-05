@@ -40,6 +40,18 @@ setup() {
   [ -z "$(git -C "$HOME/git/myorg/repo2" status --porcelain)" ]
 }
 
+@test "switch-to-branch plain checkout failure is reported (SUR-2378)" {
+  run "$SWITCH" -o myorg -b nonexistent-branch -v
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Failed to checkout branch nonexistent-branch"* ]]
+}
+
+@test "switch-to-branch plain checkout stderr is not swallowed (SUR-2378)" {
+  run "$SWITCH" -o myorg -b nonexistent-branch -v
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"pathspec"* || "$output" == *"did not match"* ]]
+}
+
 @test "switch-to-branch -n does not checkout existing branch when create fails (SUR-2334)" {
   git -C "$HOME/git/myorg/repo1" branch -f sur2334-newb main >/dev/null
   run "$SWITCH" -o myorg -n -b sur2334-newb -v

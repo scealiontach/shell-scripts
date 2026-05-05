@@ -52,10 +52,10 @@ for d in "$TARGET_DIR"/*; do
       else
         log::warn "Failed to create new branch $BRANCH in $d — $_new_branch_err; not falling back to checkout of an existing branch"
       fi
-    elif exec::hide git::cmd checkout "$BRANCH" "$@"; then
+    elif _checkout_err=$(git::cmd checkout "$BRANCH" "$@" 2>&1); then
       log::info "Checked out $BRANCH in $d"
     else
-      log::warn "Failed to checkout branch $BRANCH in $d"
+      log::warn "Failed to checkout branch $BRANCH in $d — $_checkout_err"
     fi
     if ! cd - >/dev/null; then
       log::warn "Cannot cd back to OWD"
