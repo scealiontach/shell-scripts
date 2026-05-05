@@ -144,3 +144,16 @@ run_cp() {
   [[ "$output" == *"jq is either not installed or not on the PATH"* ]]
   [[ "$output" != *"-r: command not found"* ]]
 }
+
+@test "docker::registrycmd fails with empty docker config auth for registry (SUR-2337)" {
+  run bash -c "
+    export LOGFILE_DISABLE=true
+    mkdir -p \"\$HOME/.docker\"
+    printf '%s\n' '{}' > \"\$HOME/.docker/config.json\"
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::registrycmd _catalog 'registry.example.invalid'
+  "
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"No docker credentials"* ]] || [[ "$output" == *"docker login"* ]]
+}
