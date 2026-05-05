@@ -87,13 +87,28 @@ function log::level() {
 }
 
 # Initialise the LOG_DISABLE_* flags from LOG_LEVEL at source time so
-# scripts that don't pass -v still get deterministic gating. Skip if a
-# caller has already pre-set any of the disable flags directly (so
-# explicit pre-set values survive sourcing).
-if [ -z "${LOG_DISABLE_INFO+set}" ] && [ -z "${LOG_DISABLE_DEBUG+set}" ] &&
-  [ -z "${LOG_DISABLE_WARNING+set}" ] && [ -z "${LOG_DISABLE_TRACE+set}" ]; then
-  log::level "$LOG_LEVEL"
-fi
+# scripts that don't pass -v still get deterministic gating. Each flag is
+# initialised independently: SUR-2347 — pre-fix, if a caller pre-set any
+# single flag (e.g. LOG_DISABLE_INFO=false) the entire block was skipped,
+# leaving the other three unset (empty), and `[ "$LOG_DISABLE_TRACE" =
+# "false" ]` evaluated false, silently disabling output. Snapshot the
+# caller's explicit pre-sets, let log::level recompute defaults from
+# LOG_LEVEL, then restore the snapshots so explicit values win.
+__log_preset_trace=${LOG_DISABLE_TRACE+x}
+__log_preset_debug=${LOG_DISABLE_DEBUG+x}
+__log_preset_info=${LOG_DISABLE_INFO+x}
+__log_preset_warning=${LOG_DISABLE_WARNING+x}
+__log_value_trace=${LOG_DISABLE_TRACE-}
+__log_value_debug=${LOG_DISABLE_DEBUG-}
+__log_value_info=${LOG_DISABLE_INFO-}
+__log_value_warning=${LOG_DISABLE_WARNING-}
+log::level "$LOG_LEVEL"
+[ "$__log_preset_trace" = x ] && LOG_DISABLE_TRACE=$__log_value_trace
+[ "$__log_preset_debug" = x ] && LOG_DISABLE_DEBUG=$__log_value_debug
+[ "$__log_preset_info" = x ] && LOG_DISABLE_INFO=$__log_value_info
+[ "$__log_preset_warning" = x ] && LOG_DISABLE_WARNING=$__log_value_warning
+unset __log_preset_trace __log_preset_debug __log_preset_info __log_preset_warning
+unset __log_value_trace __log_value_debug __log_value_info __log_value_warning
 
 function log::level_increase() {
   @doc Increase the LOG_LEVEL

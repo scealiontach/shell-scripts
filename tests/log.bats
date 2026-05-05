@@ -115,3 +115,44 @@ probe_level() {
   " 2>&1)
   [[ "$out" == *"hit-info from-shim"* ]]
 }
+
+# SUR-2347: source-time guard must initialise each LOG_DISABLE_* flag
+# independently. Pre-fix: pre-setting only one flag short-circuited the
+# `if [ -z ... ] && [ -z ... ] && ...` guard, leaving the other three
+# unset (empty), so `[ "$LOG_DISABLE_X" = "false" ]` evaluated false and
+# silently disabled those levels.
+@test "log.sh initialises every LOG_DISABLE_* flag independently when caller pre-sets one (SUR-2347)" {
+  out=$(bash -c "
+    LOG_DISABLE_INFO=false
+    LOG_LEVEL=4
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    echo \"TRACE=\$LOG_DISABLE_TRACE DEBUG=\$LOG_DISABLE_DEBUG INFO=\$LOG_DISABLE_INFO WARNING=\$LOG_DISABLE_WARNING\"
+  ")
+  [[ "$out" == "TRACE=false DEBUG=false INFO=false WARNING=false" ]]
+}
+
+# Caller pre-set values must survive log::level's recompute (i.e. the
+# caller's explicit pre-set wins over the LOG_LEVEL default).
+@test "log.sh preserves caller pre-set LOG_DISABLE_* values (SUR-2347)" {
+  out=$(bash -c "
+    LOG_DISABLE_INFO=true
+    LOG_LEVEL=4
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    echo \"INFO=\$LOG_DISABLE_INFO\"
+  ")
+  [[ "$out" == "INFO=true" ]]
+}
+
+# When no flag is pre-set, behaviour matches the existing baseline:
+# log::level "$LOG_LEVEL" populates all four.
+@test "log.sh source-time init matches log::level when nothing pre-set (SUR-2347)" {
+  out=$(bash -c "
+    LOG_LEVEL=2
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    echo \"TRACE=\$LOG_DISABLE_TRACE DEBUG=\$LOG_DISABLE_DEBUG INFO=\$LOG_DISABLE_INFO WARNING=\$LOG_DISABLE_WARNING\"
+  ")
+  [[ "$out" == "TRACE=true DEBUG=true INFO=false WARNING=false" ]]
+}
