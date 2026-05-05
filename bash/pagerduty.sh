@@ -67,6 +67,13 @@ function pagerduty::send_incident() {
   local incident_key="${6}"
 
   local rc=0
+  local incident_payload
+  incident_payload=$(
+    pagerduty::_incident_data "$service_id" "$alert_type" "$alert_title" "$incident_key"
+  )
+  local xtrace_was_on=0
+  case $- in *x*) xtrace_was_on=1 ;; esac
+  { set +x; } 2>/dev/null
   # --fail-with-body needs curl >= 7.76.0 (Apr 2021). On older hosts curl
   # exits non-zero with "option unknown" — caller still sees a non-zero rc
   # below, just with a less specific error body than --fail-with-body
@@ -77,8 +84,11 @@ function pagerduty::send_incident() {
     --header 'Accept: application/vnd.pagerduty+json;version=2' \
     --header "From: $alert_from" \
     --header "Authorization: Token token=$alert_token" \
-    --data "$(pagerduty::_incident_data "$service_id" "$alert_type" "$alert_title" "$incident_key")" \
+    --data "$incident_payload" \
     "${PAGERDUTY_INCIDENTS_URL:-https://api.pagerduty.com/incidents}" || rc=$?
+  if [ "$xtrace_was_on" -eq 1 ]; then
+    set -x
+  fi
   if [ "$rc" -ne 0 ]; then
     log::error "PagerDuty incident send failed (curl rc=$rc)"
     return "$rc"

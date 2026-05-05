@@ -123,9 +123,24 @@ function aws::wait_for_scan_complete {
   local repository=${1:?}
   local tag=${2:?}
   local wait_time=${3:-10}
-  while ! aws::is_scan_complete "$repository" "$tag"; do
+  local max_attempts=${4:-30}
+  local attempt=0
+  local status
+  while [ "$attempt" -lt "$max_attempts" ]; do
+    status=$(aws::scan_status "$repository" "$tag")
+    if [ "$status" = "COMPLETE" ]; then
+      return 0
+    fi
+    if [ "$status" = "FAILED" ]; then
+      log::error "ECR image scan FAILED for ${repository}:${tag}"
+      return 1
+    fi
+    log::trace "Waiting for ECR scan ${repository}:${tag} status=${status} attempt=$((attempt + 1))/${max_attempts}"
     sleep "$wait_time"
+    attempt=$((attempt + 1))
   done
+  log::error "Timed out waiting for ECR scan to complete for ${repository}:${tag} after ${max_attempts} attempts (${wait_time}s interval)"
+  return 1
 }
 
 function aws::list_findings {

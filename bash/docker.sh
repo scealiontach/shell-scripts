@@ -174,9 +174,25 @@ function docker::login() {
 function docker::registrycmd {
   local url=${1:?}
   local registry=${2:?}
+  local config="${HOME}/.docker/config.json"
   local basic_token
-  basic_token=$(docker::_jq -r ".auths.\"$registry\".auth" ~/.docker/config.json)
-  $(commands::use curl) -s -H "Authorization: Basic $basic_token" "https://$registry/v2/$url"
+  if [ ! -r "$config" ]; then
+    log::error "Docker config missing or unreadable: $config (try: docker login $registry)"
+    return 1
+  fi
+  # shellcheck disable=SC2016 # jq filter: $reg is a jq binding from --arg, not bash.
+  if ! basic_token=$(
+    docker::_jq -r --arg reg "$registry" \
+      '(.auths[$reg] // {}).auth // empty' "$config"
+  ); then
+    log::error "Could not read docker auth for registry '$registry' from $config"
+    return 1
+  fi
+  if [ -z "$basic_token" ] || [ "$basic_token" = "null" ]; then
+    log::error "No docker credentials for registry '$registry' in $config (try: docker login $registry)"
+    return 1
+  fi
+  $(commands::use curl) -fsS -H "Authorization: Basic $basic_token" "https://$registry/v2/$url"
 }
 
 function docker::list_repositories {

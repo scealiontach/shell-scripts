@@ -102,3 +102,23 @@ setup() {
   [[ "$output" == *"svc1"* ]]
   [[ "$output" == *"key-1"* ]]
 }
+
+@test "pagerduty::send_incident does not emit Token token= secret in xtrace (SUR-2339)" {
+  run bash -c "
+    trace=\$(mktemp)
+    trap 'rm -f \"\$trace\"' EXIT
+    source '$REPO_ROOT/bash/includer.sh'
+    @include pagerduty
+    pagerduty::_curl() { return 0; }
+    exec 2>\"\$trace\"
+    set -x
+    pagerduty::send_incident SVC1 incident T from 'PD_TOKEN_SUR2339_XYZ' ''
+    set +x
+    exec 2>&1
+    if grep -F 'Token token=PD_TOKEN_SUR2339_XYZ' \"\$trace\"; then
+      exit 1
+    fi
+    exit 0
+  "
+  [ "$status" -eq 0 ]
+}
