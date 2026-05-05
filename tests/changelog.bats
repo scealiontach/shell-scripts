@@ -99,17 +99,49 @@ teardown() {
 }
 
 @test "changelog -t <future-date> alone produces a non-empty range from repo root (SUR-2327)" {
-  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -t 2999-01-01"
+  # 2050-01-01 is the future-but-parseable upper bound for git's approxidate
+  # parser. Pre-2026 we used 2999-01-01, but git rev-list's --before/--after
+  # silently misparse 2999 and return wrong sets, masking the SUR-2327
+  # follow-up bug ("flag passed but no match" must NOT silently expand).
+  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -t 2050-01-01"
   [ "$status" -eq 0 ]
   [[ "$output" == *"feat: post-tag change"* ]]
   [[ "$output" != *"No change history in the requested range"* ]]
 }
 
 @test "changelog -f and -t together produce a bounded range (SUR-2327)" {
-  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -f 1970-01-01 -t 2999-01-01"
+  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -f 1970-01-01 -t 2050-01-01"
   [ "$status" -eq 0 ]
   [[ "$output" == *"feat: post-tag change"* ]]
   [[ "$output" != *"No change history in the requested range"* ]]
+}
+
+# SUR-2327 follow-up: the SUR-2327 default-endpoint fix must not silently
+# expand the range when the user passes -t with a date older than every
+# commit. Pre-fix this branch defaulted to_commit=HEAD and dumped the
+# full history — the opposite of what the user asked for.
+@test "changelog -t <pre-history-date> reports no commits, not full history (SUR-2327)" {
+  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -t 1900-01-01"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"feat: initial"* ]]
+  [[ "$output" != *"feat: second"* ]]
+  [[ "$output" != *"feat: third"* ]]
+  [[ "$output" != *"feat: post-tag change"* ]]
+  [[ "$output" == *"No commits before 1900-01-01"* ]]
+}
+
+# SUR-2327 follow-up: same disambiguation for -f with a date after HEAD.
+# Pre-fix this branch defaulted from_commit to the repo root and dumped
+# the full history. 2050-01-01 chosen instead of 2999-01-01 because git
+# rev-list's date parser silently misparses 2999 and would mask the bug.
+@test "changelog -f <post-history-date> reports no commits, not full history (SUR-2327)" {
+  run bash -c "cd '$FIXTURE_DIR' && '$CHANGELOG' -f 2050-01-01"
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"feat: initial"* ]]
+  [[ "$output" != *"feat: second"* ]]
+  [[ "$output" != *"feat: third"* ]]
+  [[ "$output" != *"feat: post-tag change"* ]]
+  [[ "$output" == *"No commits on or after 2050-01-01"* ]]
 }
 
 # SUR-1939: count::fromto invocations to guarantee we don't run twice
