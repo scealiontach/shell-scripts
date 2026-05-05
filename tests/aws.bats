@@ -55,3 +55,27 @@ setup() {
   "
   [ "$status" -ne 0 ]
 }
+
+@test "aws::wait_for_scan_complete returns non-zero after bounded attempts when stuck (SUR-2340)" {
+  run bash -c "
+    export LOG_DISABLE_TRACE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    aws::scan_status() { echo 'IN_PROGRESS'; }
+    sleep() { :; }
+    aws::wait_for_scan_complete myrepo mytag 0 5
+  "
+  [ "$status" -ne 0 ]
+}
+
+@test "aws::wait_for_scan_complete returns non-zero promptly on FAILED status (SUR-2340)" {
+  run bash -c "
+    export LOG_DISABLE_TRACE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    aws::scan_status() { echo 'FAILED'; }
+    sleep() { :; }
+    aws::wait_for_scan_complete myrepo mytag 0 99
+  "
+  [ "$status" -ne 0 ]
+}
