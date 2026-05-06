@@ -181,21 +181,23 @@ done
 function output() {
   local color=$1
   shift
+  local use_color=false
+  [ -t 1 ] && use_color=true
   local record name pr_count branch version
   for record in "$@"; do
     IFS=$'\t' read -r name pr_count branch version <<<"$record"
     printf "%-${max_repo_len}s " "$name"
     printf "%-5s " "$pr_count"
     if [ "$branch" != "master" ] && [ "$branch" != "main" ]; then
-      tput setaf 6
+      if $use_color; then tput setaf 6; fi
     else
-      tput setaf 2
+      if $use_color; then tput setaf 2; fi
     fi
     printf "%-${max_branch_len}s " "$branch"
-    tput sgr0
-    tput setaf "$color"
+    if $use_color; then tput sgr0; fi
+    if $use_color; then tput setaf "$color"; fi
     printf "%-10s\n" "$version"
-    tput sgr0
+    if $use_color; then tput sgr0; fi
   done
 }
 

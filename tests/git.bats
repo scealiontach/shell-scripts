@@ -83,3 +83,63 @@ run_projecturl_with_remote() {
   out=$(run_projecturl_with_remote "git@github.com:scealiontach/shell-scripts.git")
   [ "$out" = "$EXPECTED" ]
 }
+
+# SUR-2454: git::tagsinhistory replaced with git for-each-ref
+
+@test "git::tagsinhistory returns one tag per line in newest-first order (SUR-2454)" {
+  TAGGED_REPO=$(mktemp -d)
+  helpers::make_fixture_repo "$TAGGED_REPO" --tagged
+  out=$(bash -c "
+    cd '$TAGGED_REPO'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include git
+    git::tagsinhistory
+  ")
+  first=$(printf '%s\n' "$out" | head -1)
+  last=$(printf '%s\n' "$out" | tail -1)
+  [ "$first" = "v0.3.0" ]
+  [ "$last" = "v0.1.0" ]
+  rm -rf "$TAGGED_REPO"
+}
+
+@test "git::tagsinhistory returns empty output for repo with no tags (SUR-2454)" {
+  UNTAGGED_REPO=$(mktemp -d)
+  helpers::make_fixture_repo "$UNTAGGED_REPO"
+  out=$(bash -c "
+    cd '$UNTAGGED_REPO'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include git
+    git::tagsinhistory
+  ")
+  [ -z "$out" ]
+  rm -rf "$UNTAGGED_REPO"
+}
+
+# SUR-2471: git::version_with_dirty_marker uses conditional --dirty semantics
+
+@test "git::version_with_dirty_marker has no -dirty suffix on a clean tree (SUR-2471)" {
+  CLEAN_REPO=$(mktemp -d)
+  helpers::make_fixture_repo "$CLEAN_REPO" --tagged
+  out=$(bash -c "
+    cd '$CLEAN_REPO'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include git
+    git::version_with_dirty_marker
+  ")
+  [[ "$out" != *"-dirty" ]]
+  rm -rf "$CLEAN_REPO"
+}
+
+@test "git::version_with_dirty_marker appends -dirty on a dirty tree (SUR-2471)" {
+  DIRTY_REPO=$(mktemp -d)
+  helpers::make_fixture_repo "$DIRTY_REPO" --tagged
+  echo "dirty" >>"$DIRTY_REPO/README"
+  out=$(bash -c "
+    cd '$DIRTY_REPO'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include git
+    git::version_with_dirty_marker
+  ")
+  [[ "$out" == *"-dirty" ]]
+  rm -rf "$DIRTY_REPO"
+}
