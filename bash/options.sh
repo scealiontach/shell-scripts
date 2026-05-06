@@ -264,9 +264,11 @@ function options::standard() {
 
 function options::parse_available() {
   @doc Parse argv against the configured option set. Does not exit when argv \
-    is empty. Callers that need the legacy "bare invocation prints help" \
-    behaviour should use options::parse or set NO_SYNTAX_EXIT around \
-    options::parse. Always runs mandatory-option validation after getopts.
+    is empty. Callers that want empty argv to print syntax help and exit should \
+    use options::parse. Setting NO_SYNTAX_EXIT is only for use with \
+    options::parse: it suppresses that empty-argv syntax exit so zero-flag \
+    invocations are allowed. See options::parse for the OPTIND caveat when \
+    parsing again. Always runs mandatory-option validation after getopts.
   @arg "$@" the provided argument array
   OPTIONS_SEEN=()
   while options::getopts opt "$@"; do

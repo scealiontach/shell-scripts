@@ -249,3 +249,17 @@ probe_level() {
   [ "$output" = "0" ]
   [[ "$stderr" == *"LOG_LEVEL already at minimum"* ]]
 }
+
+@test "log::level_increase completes under set -e when result is 0 (SUR-2490 parity)" {
+  run bash -c "
+    set -e
+    LOG_LEVEL=-1
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    log::level_increase
+    echo \"ok LOG_LEVEL=\$LOG_LEVEL\"
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok LOG_LEVEL=0"* ]]
+}

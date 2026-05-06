@@ -112,7 +112,9 @@ unset __log_value_trace __log_value_debug __log_value_info __log_value_warning
 
 function log::level_increase() {
   @doc Increase the LOG_LEVEL
-  ((LOG_LEVEL += 1))
+  # Use $(( )) not ((var += 1)): the latter exits 1 when the result is 0, so
+  # set -e aborts (symmetry with log::level_decrease, SUR-2490).
+  LOG_LEVEL=$((LOG_LEVEL + 1))
   log::level "$LOG_LEVEL"
 }
 
