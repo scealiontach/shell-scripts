@@ -1,6 +1,8 @@
 #!/usr/bin/env bats
 # SUR-1850 seed: log::level cumulative gating per documented table.
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   load 'helpers.bash'
   helpers::isolate_home
@@ -193,9 +195,9 @@ probe_level() {
   [[ "$out" == "INFO date=%DATE" ]]
 }
 
-# SUR-2475: log::level_decrease floor guard
+# SUR-2490 / SUR-2476: log::level_decrease under set -e and floor guard
 
-@test "log::level_decrease from non-zero decrements LOG_LEVEL (SUR-2475)" {
+@test "log::level_decrease from non-zero decrements LOG_LEVEL (SUR-2476)" {
   run bash -c "
     LOG_LEVEL=2
     source '$REPO_ROOT/bash/includer.sh'
@@ -207,7 +209,21 @@ probe_level() {
   [ "$output" = "1" ]
 }
 
-@test "log::level_decrease at LOG_LEVEL=0 leaves level unchanged (SUR-2475)" {
+@test "log::level_decrease completes under set -e when LOG_LEVEL > 0 (SUR-2490)" {
+  run bash -c "
+    set -e
+    LOG_LEVEL=1
+    LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    log::level_decrease
+    echo \"ok LOG_LEVEL=\$LOG_LEVEL\"
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"ok LOG_LEVEL=0"* ]]
+}
+
+@test "log::level_decrease at LOG_LEVEL=0 leaves level unchanged (SUR-2476)" {
   run bash -c "
     LOG_LEVEL=0
     source '$REPO_ROOT/bash/includer.sh'
@@ -217,4 +233,18 @@ probe_level() {
   "
   [ "$status" -eq 0 ]
   [ "$output" = "0" ]
+}
+
+@test "log::level_decrease at floor emits log::warn when warnings enabled (SUR-2476)" {
+  run --separate-stderr bash -c "
+    LOG_LEVEL=0
+    LOG_DISABLE_WARNING=false
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    log::level_decrease
+    echo \$LOG_LEVEL
+  "
+  [ "$status" -eq 0 ]
+  [ "$output" = "0" ]
+  [[ "$stderr" == *"LOG_LEVEL already at minimum"* ]]
 }
