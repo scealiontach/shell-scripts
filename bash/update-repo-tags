@@ -81,9 +81,19 @@ elif [ "$CHANGES" -gt 0 ]; then
   # if we can't annotate tag then we must do a prerel bump
   if [ "${ANNOTATE_TAG}" = "false" ]; then
     PREREL=$("$(dirs::of)/semver" get prerel "$LATEST_VERSION")
-    ((PREREL++))
-    TAG=$("$(dirs::of)/semver" bump prerel "$PREREL" "$LATEST_VERSION")
-    TAG=${TAG/"-$PREREL"/"p$PREREL"}
+    # Lightweight-tag path: numeric prerel segments only. Non-numeric values
+    # break arithmetic and the -$PREREL substitution can corrupt the tag
+    # (SUR-2457). Empty prerel starts the pN sequence at 1.
+    if [[ -z "$PREREL" ]]; then
+      NEXT_PREREL=1
+    elif [[ "$PREREL" =~ ^[0-9]+$ ]]; then
+      NEXT_PREREL=$((10#$PREREL + 1))
+    else
+      log::notice "Non-numeric prerel '${PREREL}' in ${LATEST_VERSION}; resetting lightweight prerel counter to 1"
+      NEXT_PREREL=1
+    fi
+    TAG=$("$(dirs::of)/semver" bump prerel "$NEXT_PREREL" "$LATEST_VERSION")
+    TAG=${TAG/"-${NEXT_PREREL}"/"p${NEXT_PREREL}"}
   else
     TAG=$("$(dirs::of)/semver" bump patch "$LATEST_VERSION")
   fi
