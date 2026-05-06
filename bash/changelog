@@ -103,7 +103,8 @@ function ::full() {
       # blank line that pre-fix `uniq` collapsed from ::fromto's two
       # tail echoes — without it the regenerated CHANGELOG.md drops
       # the final newline relative to the pre-fix output.
-      body=$(::fromto "$tag" "HEAD" "$url_base" | grep -v '^* ci' | uniq)
+      # awk '!seen[$0]++' deduplicates while preserving line order (unlike sort|uniq)
+      body=$(::fromto "$tag" "HEAD" "$url_base" | grep -v '^* ci' | awk '!seen[$0]++')
       # Emptiness gate like pre-SUR-1939 `grep .` — newline-only $body is not empty per `[ -n`.
       if printf '%s\n' "$body" | grep -q .; then
         if [ "$this_version" != "$tag" ]; then
@@ -114,7 +115,7 @@ function ::full() {
         fi
       fi
     else
-      body=$(::fromto "$tag" "$later_tag" "$url_base" | grep -v '^* ci' | uniq)
+      body=$(::fromto "$tag" "$later_tag" "$url_base" | grep -v '^* ci' | awk '!seen[$0]++')
       if printf '%s\n' "$body" | grep -q .; then
         echo "## $later_tag"
         echo
