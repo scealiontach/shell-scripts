@@ -3,6 +3,8 @@
 # against a synthetic git repo. Specifically locks down the Xp1 prerel
 # post-processing on lines 84-86 of update-repo-tags (replace -N with pN).
 
+bats_require_minimum_version 1.5.0
+
 setup() {
   load 'helpers.bash'
   helpers::isolate_home
@@ -94,6 +96,28 @@ latest_tag() {
   run "$UPDATE" -t "$REPO"
   [ "$status" -eq 0 ]
   [ "$(latest_tag)" = "v0.1.0p2" ]
+}
+
+@test "lightweight tag with non-numeric prerel resets to p1 with notice (SUR-2457)" {
+  local stderr
+  commit_msg "feat: initial"
+  light_tag v0.1.0-foo
+  commit_msg "fix: something"
+  run --separate-stderr "$UPDATE" -t "$REPO"
+  [ "$status" -eq 0 ]
+  [ "$(latest_tag)" = "v0.1.0p1" ]
+  [[ "$stderr" == *"Non-numeric prerel"* ]]
+}
+
+@test "lightweight tag with dotted prerel does not corrupt next tag (SUR-2457)" {
+  local stderr
+  commit_msg "feat: initial"
+  light_tag v0.1.0-rc.1
+  commit_msg "fix: something"
+  run --separate-stderr "$UPDATE" -t "$REPO"
+  [ "$status" -eq 0 ]
+  [ "$(latest_tag)" = "v0.1.0p1" ]
+  [[ "$stderr" == *"Non-numeric prerel"* ]]
 }
 
 @test "refuses to bump minor on breaking change without -b" {

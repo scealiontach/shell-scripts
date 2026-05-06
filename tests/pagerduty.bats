@@ -103,6 +103,42 @@ setup() {
   [[ "$output" == *"key-1"* ]]
 }
 
+@test "pagerduty::_incident_data omits incident_key when key is empty (SUR-2479)" {
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include pagerduty
+    pagerduty::_incident_data svc incident title '' | jq -e '.incident | has(\"incident_key\") | not'
+  "
+  [ "$status" -eq 0 ]
+}
+
+@test "pagerduty::_incident_data includes incident_key when key non-empty (SUR-2479)" {
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include pagerduty
+    pagerduty::_incident_data svc incident title my-key | jq -e '.incident.incident_key == \"my-key\"'
+  "
+  [ "$status" -eq 0 ]
+}
+
+@test "pagerduty::send_incident passes --fail-with-body to curl on HTTP failure path (SUR-2479)" {
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include pagerduty
+    pagerduty::_curl() {
+      case \" \$* \" in
+        *' --fail-with-body '*) ;;
+        *) echo 'missing --fail-with-body' >&2; return 99 ;;
+      esac
+      return 22
+    }
+    pagerduty::send_incident SVC1 incident T from token ''
+  "
+  [ "$status" -eq 22 ]
+  [[ "$output" != *"missing --fail-with-body"* ]]
+  [[ "$output" == *"PagerDuty incident send failed"* ]]
+}
+
 @test "pagerduty::send_incident does not emit Token token= secret in xtrace (SUR-2339)" {
   run bash -c "
     trace=\$(mktemp)

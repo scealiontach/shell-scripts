@@ -112,19 +112,24 @@ unset __log_value_trace __log_value_debug __log_value_info __log_value_warning
 
 function log::level_increase() {
   @doc Increase the LOG_LEVEL
-  ((LOG_LEVEL += 1))
+  # Use $(( )) not ((var += 1)): the latter exits 1 when the result is 0, so
+  # set -e aborts (symmetry with log::level_decrease, SUR-2490).
+  LOG_LEVEL=$((LOG_LEVEL + 1))
   log::level "$LOG_LEVEL"
 }
 
 function log::level_decrease() {
-  @doc Decrease the LOG_LEVEL by 1. The minimum effective level is 0, calling this
-  @doc function at LOG_LEVEL=0 logs a warning and returns without changing the level.
-  @doc Mirrors log::level_increase. Call log::level after adjusting to re-apply flags.
+  @doc Decrease LOG_LEVEL by 1 and refresh disable flags via log::level. At \
+    LOG_LEVEL=0, calls log::warn and returns unchanged — the message is gated \
+    like other warnings, so at default level 0 it may not print. Safe under \
+    set -e. Pair with log::level_increase for reversible verbosity toggles.
   if ((LOG_LEVEL <= 0)); then
     log::warn "log::level_decrease: LOG_LEVEL already at minimum (0); ignoring"
     return
   fi
-  ((LOG_LEVEL -= 1))
+  # Use $(( )) not ((var -= 1)): the latter exits 1 when the result is 0, so
+  # set -e aborts after decrementing from LOG_LEVEL=1 (SUR-2490).
+  LOG_LEVEL=$((LOG_LEVEL - 1))
   log::level "$LOG_LEVEL"
 }
 

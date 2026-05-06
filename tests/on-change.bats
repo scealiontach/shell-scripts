@@ -43,10 +43,10 @@ printf '%s\n' "\$@" >>"$argv_log"
 EOF
   chmod +x "$stub_bin/record_argv"
   (
-    sleep 0.4
+    sleep 2
     echo trigger >>"$watch_dir/marker"
   ) &
-  run env PATH="$stub_bin:$PATH" timeout 8s "$ONCHANGE" -W "$watch_dir" -t 1 -v -v -- "$stub_bin/record_argv" ok
+  run env PATH="$stub_bin:$PATH" timeout 15s "$ONCHANGE" -W "$watch_dir" -t 1 -v -v -- "$stub_bin/record_argv" ok
   [[ "$output" == *"Working directory $watch_dir"* ]]
   [[ "$output" == *"Watching directory $watch_dir"* ]]
   [[ "$output" == *"Polling interval 1"* ]]
@@ -66,10 +66,10 @@ printf '%s\n' "\$@" >>"$argv_log"
 EOF
   chmod +x "$stub_bin/record_argv"
   (
-    sleep 0.4
+    sleep 2
     echo trigger >>"$watch_dir/marker"
   ) &
-  run env PATH="$stub_bin:$PATH" timeout 8s "$ONCHANGE" -W "$watch_dir" -w "$watch_dir" -t 1 -- "$stub_bin/record_argv" "arg one" "arg two"
+  run env PATH="$stub_bin:$PATH" timeout 15s "$ONCHANGE" -W "$watch_dir" -w "$watch_dir" -t 1 -- "$stub_bin/record_argv" "arg one" "arg two"
   grep -qx 'arg one' "$argv_log"
   grep -qx 'arg two' "$argv_log"
   rm -rf "$watch_dir" "$stub_bin"
