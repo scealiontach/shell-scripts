@@ -263,7 +263,10 @@ function options::standard() {
 }
 
 function options::parse_available() {
-  @doc parse the options using the provided argument array
+  @doc Parse argv against the configured option set. Does not exit when argv \
+    is empty. Callers that need the legacy "bare invocation prints help" \
+    behaviour should use options::parse or set NO_SYNTAX_EXIT around \
+    options::parse. Always runs mandatory-option validation after getopts.
   @arg "$@" the provided argument array
   OPTIONS_SEEN=()
   while options::getopts opt "$@"; do
@@ -306,7 +309,12 @@ function options::parse_available() {
 }
 
 function options::parse() {
-  @doc parse the options using the provided argument array, if no args passes print syntax and exit
+  @doc Parse argv against the configured option set. After a successful \
+    parse, if argv was empty so no flags were consumed and OPTIND is still 1 \
+    and NO_SYNTAX_EXIT is unset, prints syntax and exits 1. Set NO_SYNTAX_EXIT \
+    to any non-empty value to allow zero-flag invocations such as commands \
+    that take only positionals. That leaks the opt-ind state from this \
+    parse into later code, so clear or reset OPTIND if you parse again.
   @arg "$@" the provided argument array
   options::parse_available "$@"
   if [ -z "${NO_SYNTAX_EXIT}" ] && [ "${OPTIND}" -eq 1 ]; then

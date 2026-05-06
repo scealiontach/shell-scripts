@@ -19,6 +19,19 @@ source "$(dirname "${BASH_SOURCE[0]}")/doc.sh"
 
 @package includer
 
+# @include NAME — load bash/NAME or bash/NAME.sh once per process.
+#
+# Resolution: try dirname(BASH_SOURCE)/NAME first; if unreadable, try the
+# same path with a .sh suffix. Same order as includer::find.
+#
+# Deduplication: cksum(true_file) defines a global guard include_<cksum>;
+# the first successful source sets it so later @include of the same path
+# is a no-op. Two paths that cksum differently (e.g. symlink vs canonical)
+# load twice; hardlinks to the same inode share a cksum and dedupe.
+#
+# Errors: missing file prints to stderr and returns 1 (does not exit),
+# so callers can handle failures under set -e.
+
 function @include {
   local include_file=${1:?}
   local true_file
@@ -40,7 +53,9 @@ function @include {
 }
 
 function includer::find {
-  @doc Find the file referred to as an include.
+  @doc Resolve bash/STEM or bash/STEM.sh the same way as @include: bare \
+    filename first, .sh suffix second. Echo the readable path or return 1 \
+    when missing.
   @arg _1_ the name of the include
   local include_file=${1:?}
   local true_file
