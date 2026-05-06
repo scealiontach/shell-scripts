@@ -134,48 +134,75 @@ declare -a UNCOMMITTED=()
 declare -a RELEASABLE=()
 declare -a DEVELOPMENT=()
 for repo in $(find "${base_path}${EXTRA}" -mindepth "${DEPTH}" -maxdepth "${DEPTH}" -name .git -exec dirname {} \; | sort); do
-  cd "$repo" || exit 1
-  base_name=$(base_name_for_repo "$base_path" "$repo")
-  orgname=$(dirname "$base_name")
-  branch_name=$(get_branch_name)
-  dirty_version=$(git::describe --tags 2>/dev/null)-dirty
-  version=$(git::describe --dirty --tags 2>/dev/null)
-  long_version=$(git::describe --long --tags 2>/dev/null)
+  # Per-repo work runs in a subshell so a failed or partial cd never leaves
+  # the outer script in another repository's directory (SUR-2470).
+  block=$(
+    cd "$repo" || exit 1
+    base_name=$(base_name_for_repo "$base_path" "$repo")
+    orgname=$(dirname "$base_name")
+    branch_name=$(get_branch_name)
+    dirty_version=$(git::describe --tags 2>/dev/null)-dirty
+    version=$(git::describe --dirty --tags 2>/dev/null)
+    long_version=$(git::describe --long --tags 2>/dev/null)
 
-  len=${#base_name}
-  branch_len=${#branch_name}
+    status=$(git::cmd status --short | wc -l)
+    fetch_if_possible "$base_name"
+    if [ "$status" = "0" ]; then
+      pull_if_different "$base_name" "$branch_name"
+    else
+      log::notice "Examining $base_name: dirty"
+    fi
 
+    if [ -z "$CLIENT" ]; then
+      pr_count=$(get_gh_pr_count "$orgname" "$base_name")
+    elif [ "$CLIENT" = "TASE" ]; then
+      pr_count=$(get_bb_pr_count "$CLIENT" "$base_name")
+    else
+      pr_count='.'
+    fi
+
+    # Tab-delimited record: name TAB pr_count TAB branch TAB version. Tabs
+    # are forbidden in any of these fields (repo paths and branch names use
+    # forward-slashes, not tabs), so the encoding is unambiguous.
+    if [ -z "$version" ]; then
+      version=$(git::cmd rev-parse --short HEAD)
+      printf '%s\n' UNCOMMITTED
+      printf '%s\n' "$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")"
+    elif [ "$version" = "$dirty_version" ]; then
+      printf '%s\n' UNCOMMITTED
+      printf '%s\n' "$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")"
+    elif [ "$version" != "$long_version" ]; then
+      printf '%s\n' RELEASABLE
+      printf '%s\n' "$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")"
+    else
+      printf '%s\n' DEVELOPMENT
+      printf '%s\n' "$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")"
+    fi
+  ) || exit 1
+
+  bucket=${block%%$'\n'*}
+  record=${block#*$'\n'}
+  case "$bucket" in
+    UNCOMMITTED)
+      UNCOMMITTED+=("$record")
+      ;;
+    RELEASABLE)
+      RELEASABLE+=("$record")
+      ;;
+    DEVELOPMENT)
+      DEVELOPMENT+=("$record")
+      ;;
+    *)
+      log::error "git-check: unexpected bucket from repo processing: $bucket"
+      exit 1
+      ;;
+  esac
+
+  IFS=$'\t' read -r name _ branch _ <<<"$record"
+  len=${#name}
+  branch_len=${#branch}
   max_repo_len=$((len > max_repo_len ? len : max_repo_len))
   max_branch_len=$((branch_len > max_branch_len ? branch_len : max_branch_len))
-  status=$(git::cmd status --short | wc -l)
-  fetch_if_possible "$base_name"
-  if [ "$status" = "0" ]; then
-    pull_if_different "$base_name" "$branch_name"
-  else
-    log::notice "Examining $base_name: dirty"
-  fi
-
-  if [ -z "$CLIENT" ]; then
-    pr_count=$(get_gh_pr_count "$orgname" "$base_name")
-  elif [ "$CLIENT" = "TASE" ]; then
-    pr_count=$(get_bb_pr_count "$CLIENT" "$base_name")
-  else
-    pr_count='.'
-  fi
-
-  # Tab-delimited record: name TAB pr_count TAB branch TAB version. Tabs
-  # are forbidden in any of these fields (repo paths and branch names use
-  # forward-slashes, not tabs), so the encoding is unambiguous.
-  if [ -z "$version" ]; then
-    version=$(git::cmd rev-parse --short HEAD)
-    UNCOMMITTED+=("$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")")
-  elif [ "$version" = "$dirty_version" ]; then
-    UNCOMMITTED+=("$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")")
-  elif [ "$version" != "$long_version" ]; then
-    RELEASABLE+=("$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")")
-  else
-    DEVELOPMENT+=("$(printf '%s\t%s\t%s\t%s' "$base_name" "$pr_count" "$branch_name" "$version")")
-  fi
 done
 
 function output() {

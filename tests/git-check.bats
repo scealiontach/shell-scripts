@@ -100,3 +100,13 @@ init_repo() {
   echo "$clean" | grep -E 'org/repo'
   echo "$clean" | grep -E 'v0\.3\.0-[0-9]+-g'
 }
+
+@test "git-check restores caller working directory after scanning repos (SUR-2470)" {
+  run bash -c "
+    cd /tmp || exit 1
+    before=\$PWD
+    '$GIT_CHECK' -b testbase >/dev/null 2>&1
+    [ \"\$PWD\" = \"\$before\" ]
+  "
+  [ "$status" -eq 0 ]
+}
