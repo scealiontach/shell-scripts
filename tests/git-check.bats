@@ -3,6 +3,11 @@
 # loop variable because $2 was assigned without `local`. Drive git-check
 # end-to-end against two repos on different branches and assert each
 # per-repo line carries the correct branch.
+#
+# SUR-2470: per-repo work now runs in a subshell so a failed cd never leaves
+# the outer loop in another repo's directory. The multi-repo test below
+# provides indirect regression coverage: if iteration state bled between repos
+# the branch columns would be wrong or absent.
 
 setup() {
   load 'helpers.bash'

@@ -157,3 +157,90 @@ run_cp() {
   [ "$status" -ne 0 ]
   [[ "$output" == *"No docker credentials"* ]] || [[ "$output" == *"docker login"* ]]
 }
+
+# SUR-2478: docker::repo_tags_has and docker::cp_if_different same-image path
+
+@test "docker::repo_tags_has returns 0 when inspect lists exact destination tag (SUR-2478)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true LOG_DISABLE_DEBUG=true LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::inspect() {
+      printf '%s\n' '[{\"RepoTags\":[\"registry.example/a:v1\",\"registry.example/b:v2\"]}]'
+    }
+    docker::repo_tags_has 'registry.example/a:v1' 'registry.example/b:v2'
+  "
+  [ "$status" -eq 0 ]
+}
+
+@test "docker::repo_tags_has returns 0 when tag matches after stripping index.docker.io prefix (SUR-2478)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true LOG_DISABLE_DEBUG=true LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::inspect() {
+      printf '%s\n' '[{\"RepoTags\":[\"foo/bar:tag\"]}]'
+    }
+    docker::repo_tags_has 'foo/bar:tag' 'index.docker.io/foo/bar:tag'
+  "
+  [ "$status" -eq 0 ]
+}
+
+@test "docker::repo_tags_has returns 1 when no RepoTags entry matches destination (SUR-2478)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true LOG_DISABLE_DEBUG=true LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::inspect() {
+      printf '%s\n' '[{\"RepoTags\":[\"registry.example/a:v1\"]}]'
+    }
+    docker::repo_tags_has 'registry.example/a:v1' 'registry.example/other:v9'
+  "
+  [ "$status" -ne 0 ]
+}
+
+@test "docker::cp_if_different skips tag and push when repo_tags_has matches (SUR-2478)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true LOG_DISABLE_DEBUG=true LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::pull() { return 0; }
+    docker::inspect() {
+      printf '%s\n' '[{\"RepoTags\":[\"from-img\",\"to-img\"]}]'
+    }
+    tag_calls=0
+    push_calls=0
+    docker::tag() { tag_calls=\$((tag_calls + 1)); return 0; }
+    docker::push() { push_calls=\$((push_calls + 1)); return 0; }
+    docker::cp_if_different from-img to-img
+    rc=\$?
+    echo \"tag_calls=\$tag_calls push_calls=\$push_calls rc=\$rc\"
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tag_calls=0"* ]]
+  [[ "$output" == *"push_calls=0"* ]]
+  [[ "$output" == *"rc=0"* ]]
+}
+
+@test "docker::cp_if_different pulls, tags, and pushes when images differ (SUR-2478)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true LOG_DISABLE_DEBUG=true LOGFILE_DISABLE=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include docker
+    docker::pull() { return 0; }
+    docker::inspect() {
+      printf '%s\n' '[{\"RepoTags\":[\"from-img\"]}]'
+    }
+    tag_calls=0
+    push_calls=0
+    docker::tag() { tag_calls=\$((tag_calls + 1)); return 0; }
+    docker::push() { push_calls=\$((push_calls + 1)); return 0; }
+    docker::cp_if_different from-img to-img
+    rc=\$?
+    echo \"tag_calls=\$tag_calls push_calls=\$push_calls rc=\$rc\"
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"tag_calls=1"* ]]
+  [[ "$output" == *"push_calls=1"* ]]
+  [[ "$output" == *"rc=0"* ]]
+}
