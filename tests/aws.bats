@@ -94,3 +94,73 @@ setup() {
   # refresh_scan must NOT have been called — tag '1.2.3' is not '1X2X3' literally
   [[ "$output" != *"CALLED"* ]]
 }
+
+# SUR-2477: aws::refresh_scan cache window and jq floor on fractional timestamps
+
+@test "aws::refresh_scan skips aws::scan_image when scan is COMPLETE and within cache window (SUR-2477)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    date() { printf '%s\n' '2000000000'; }
+    aws::_describe_findings() {
+      printf '%s\n' '{\"imageScanStatus\":{\"status\":\"COMPLETE\"},\"imageScanFindings\":{\"imageScanCompletedAt\":1999990000.987}}'
+    }
+    aws::scan_image() { echo SCAN_IMAGE_CALLED; return 0; }
+    aws::refresh_scan myrepo mytag 7
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"SCAN_IMAGE_CALLED"* ]]
+}
+
+@test "aws::refresh_scan calls aws::scan_image when COMPLETE scan is older than cache window (SUR-2477)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    date() { printf '%s\n' '2000000000'; }
+    aws::_describe_findings() {
+      printf '%s\n' '{\"imageScanStatus\":{\"status\":\"COMPLETE\"},\"imageScanFindings\":{\"imageScanCompletedAt\":1000.1}}'
+    }
+    aws::scan_image() { echo SCAN_IMAGE_CALLED; return 0; }
+    aws::refresh_scan myrepo mytag 7
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SCAN_IMAGE_CALLED"* ]]
+}
+
+@test "aws::refresh_scan calls aws::scan_image when scan is not COMPLETE (SUR-2477)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    date() { printf '%s\n' '2000000000'; }
+    aws::_describe_findings() {
+      printf '%s\n' '{\"imageScanStatus\":{\"status\":\"IN_PROGRESS\"}}'
+    }
+    aws::scan_image() { echo SCAN_IMAGE_CALLED; return 0; }
+    aws::refresh_scan myrepo mytag 7
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"SCAN_IMAGE_CALLED"* ]]
+}
+
+@test "aws::refresh_scan uses jq floor so fractional scan time does not spuriously refresh (SUR-2477)" {
+  run bash -c "
+    export LOG_DISABLE_INFO=true
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    # Window edge: earliest = 2000000000 - 604800 = 1999395200
+    # Integer part 1999395200 is not fresh; 1999395200.001 floor is still 1999395200,
+    # so earliest < completedAt is false — would refresh without careful equality.
+    # Use completedAt just above earliest as integer: 1999395201.999 floors to 1999395201.
+    date() { printf '%s\n' '2000000000'; }
+    aws::_describe_findings() {
+      printf '%s\n' '{\"imageScanStatus\":{\"status\":\"COMPLETE\"},\"imageScanFindings\":{\"imageScanCompletedAt\":1999395201.999}}'
+    }
+    aws::scan_image() { echo SCAN_IMAGE_CALLED; return 0; }
+    aws::refresh_scan myrepo mytag 7
+  "
+  [ "$status" -eq 0 ]
+  [[ "$output" != *"SCAN_IMAGE_CALLED"* ]]
+}
