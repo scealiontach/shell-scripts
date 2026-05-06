@@ -236,6 +236,7 @@ probe_level() {
 }
 
 @test "log::level_decrease at floor emits log::warn when warnings enabled (SUR-2476)" {
+  local stderr
   run --separate-stderr bash -c "
     LOG_LEVEL=0
     LOG_DISABLE_WARNING=false

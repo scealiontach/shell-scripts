@@ -99,6 +99,7 @@ latest_tag() {
 }
 
 @test "lightweight tag with non-numeric prerel resets to p1 with notice (SUR-2457)" {
+  local stderr
   commit_msg "feat: initial"
   light_tag v0.1.0-foo
   commit_msg "fix: something"
@@ -109,6 +110,7 @@ latest_tag() {
 }
 
 @test "lightweight tag with dotted prerel does not corrupt next tag (SUR-2457)" {
+  local stderr
   commit_msg "feat: initial"
   light_tag v0.1.0-rc.1
   commit_msg "fix: something"
