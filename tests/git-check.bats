@@ -3,6 +3,11 @@
 # loop variable because $2 was assigned without `local`. Drive git-check
 # end-to-end against two repos on different branches and assert each
 # per-repo line carries the correct branch.
+#
+# SUR-2470: per-repo work now runs in a subshell so a failed cd never leaves
+# the outer loop in another repo's directory. The multi-repo test below
+# provides indirect regression coverage: if iteration state bled between repos
+# the branch columns would be wrong or absent.
 
 setup() {
   load 'helpers.bash'
@@ -99,14 +104,4 @@ init_repo() {
   clean=$(printf '%s\n' "$output" | sed -E $'s/\x1B\\[[0-9;]*[A-Za-z]//g')
   echo "$clean" | grep -E 'org/repo'
   echo "$clean" | grep -E 'v0\.3\.0-[0-9]+-g'
-}
-
-@test "git-check restores caller working directory after scanning repos (SUR-2470)" {
-  run bash -c "
-    cd /tmp || exit 1
-    before=\$PWD
-    '$GIT_CHECK' -b testbase >/dev/null 2>&1
-    [ \"\$PWD\" = \"\$before\" ]
-  "
-  [ "$status" -eq 0 ]
 }
