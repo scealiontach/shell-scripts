@@ -65,7 +65,7 @@ function aws::scan_repository {
       aws::refresh_scan "$repository" "$tag"
     done
   else
-    if aws::get_tags "$repository" | grep -q "^$set_tag$"; then
+    if aws::get_tags "$repository" | grep -qxF "$set_tag"; then
       aws::refresh_scan "$repository" "$set_tag"
     fi
   fi

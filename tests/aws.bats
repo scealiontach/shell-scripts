@@ -79,3 +79,18 @@ setup() {
   "
   [ "$status" -ne 0 ]
 }
+
+# SUR-2459: aws::scan_repository grep uses literal fixed-string match
+
+@test "aws::scan_repository does not match '1.2.3' against literal tag '1X2X3' (SUR-2459)" {
+  run bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include aws
+    aws::get_tags() { echo '1X2X3'; }
+    aws::refresh_scan() { echo 'CALLED'; }
+    aws::scan_repository myrepo '1.2.3'
+  "
+  [ "$status" -eq 0 ]
+  # refresh_scan must NOT have been called — tag '1.2.3' is not '1X2X3' literally
+  [[ "$output" != *"CALLED"* ]]
+}
