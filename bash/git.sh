@@ -30,11 +30,11 @@ function git::cmd() {
 }
 
 function git::tagsinhistory() {
-  @doc List all the tags in the history of this commit.
-  git::cmd log --no-walk --pretty="%d" -n 100000 | grep "(tag" |
-    awk '{print $2}' | sed -e 's/)//' |
-    awk '{ for (i=NF; i>1; i--) printf("%s ",$i); print $1; }' |
-    sed -e 's/,$//'
+  @doc List all tags in the repository, newest version first.
+  git::cmd for-each-ref \
+    --sort=-version:refname \
+    --format='%(refname:short)' \
+    refs/tags/
 }
 
 function git::commit_url_base() {
@@ -100,8 +100,9 @@ function git::describe() {
 }
 
 function git::version_with_dirty_marker() {
-  @doc Get the describe-derived version string with a literal "-dirty" suffix appended unconditionally.
-  echo "$(git::describe --tags 2>/dev/null)-dirty"
+  @doc Get the describe-derived version string. Appends "-dirty" only when the
+  @doc working tree has uncommitted changes, matching "git describe --dirty" semantics.
+  git::describe --dirty --tags 2>/dev/null
 }
 
 function git::dirty_version() {
