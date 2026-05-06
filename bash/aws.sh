@@ -153,6 +153,10 @@ function aws::list_findings {
 }
 
 function aws::refresh_scan {
+  @doc Skip re-scanning an ECR image when a COMPLETE scan exists within the days_ago rolling cache window and trigger aws::scan_image otherwise
+  @arg _1_ ECR repository name
+  @arg _2_ image tag
+  @arg _3_ cache window in days default 7 re-scan if last COMPLETE scan is older than this
   local repository=${1:?}
   local tag=${2:?}
   local days_ago=${3:-7}
