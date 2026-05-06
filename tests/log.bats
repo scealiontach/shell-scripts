@@ -196,23 +196,25 @@ probe_level() {
 # SUR-2475: log::level_decrease floor guard
 
 @test "log::level_decrease from non-zero decrements LOG_LEVEL (SUR-2475)" {
-  out=$(bash -c "
+  run bash -c "
     LOG_LEVEL=2
     source '$REPO_ROOT/bash/includer.sh'
     @include log
     log::level_decrease
     echo \$LOG_LEVEL
-  ")
-  [ "$out" = "1" ]
+  "
+  [ "$status" -eq 0 ]
+  [ "$output" = "1" ]
 }
 
 @test "log::level_decrease at LOG_LEVEL=0 leaves level unchanged (SUR-2475)" {
-  out=$(bash -c "
+  run bash -c "
     LOG_LEVEL=0
     source '$REPO_ROOT/bash/includer.sh'
     @include log
-    log::level_decrease 2>/dev/null
+    log::level_decrease
     echo \$LOG_LEVEL
-  ")
-  [ "$out" = "0" ]
+  "
+  [ "$status" -eq 0 ]
+  [ "$output" = "0" ]
 }

@@ -117,8 +117,7 @@ function log::level_increase() {
 }
 
 function log::level_decrease() {
-  @doc Decrease the LOG_LEVEL by 1. The minimum effective level is 0
-  calling this
+  @doc Decrease the LOG_LEVEL by 1. The minimum effective level is 0, calling this
   @doc function at LOG_LEVEL=0 logs a warning and returns without changing the level.
   @doc Mirrors log::level_increase. Call log::level after adjusting to re-apply flags.
   if ((LOG_LEVEL <= 0)); then
