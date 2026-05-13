@@ -1,0 +1,1 @@
+Not a .sh file. bashadoc must refuse this with exit 1.
