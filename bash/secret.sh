@@ -196,7 +196,11 @@ function secret::_env_as_file {
 
 function secret::clear {
   @doc Clear secret temporary files.
-  if [ -n "${SECRET_TMPFILES[0]}" ]; then
+  # SUR-2830: use array length, not [0]. A sparse array (e.g. element 0 unset
+  # by `unset 'SECRET_TMPFILES[0]'`) would otherwise leave the populated
+  # tail-end tempfiles on disk with decrypted secret material at 0600.
+  if [ "${#SECRET_TMPFILES[@]}" -gt 0 ]; then
     rm -f "${SECRET_TMPFILES[@]}"
+    SECRET_TMPFILES=()
   fi
 }
