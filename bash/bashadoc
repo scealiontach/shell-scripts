@@ -33,9 +33,14 @@ esac
 # shellcheck disable=SC1090
 source "$1"
 
-package=$(grep "@package" "$1" | awk '{print $NF}' | tail -1)
+# SUR-2829: anchor the @package extraction so it matches only literal
+# `@package <name>` directives. The previous `grep "@package"` also
+# matched `function @package() {` in doc.sh, producing `{` as the
+# "package name". Anchoring on a leading-whitespace `@package ` and
+# taking field 2 guarantees we read the directive's argument.
+package=$(awk '/^[[:space:]]*@package[[:space:]]/{print $2}' "$1" | tail -1)
 funcs=$(declare -F | awk '{print $NF}' | grep -v "@")
-if [ "$package" != "." ]; then
+if [ -n "$package" ]; then
   title="\`$package\`"
   funcs=$(echo "$funcs" | grep "^$package::")
 else
