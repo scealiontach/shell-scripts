@@ -27,7 +27,11 @@ function _add_additional_registry {
 }
 
 options::standard
-options::description "various tools to do with releasing and publishing images"
+options::description "various tools to do with releasing and publishing\
+ images. The source organization filtered against the registry catalogue\
+ defaults to \"blockchaintp\" for historical compatibility; override via\
+ the RELEASE_IMAGES_ORG env var. -d sets SIMULATE=true so docker::cmd\
+ echoes commands instead of executing them."
 options::add -o t -d "Target tag pattern to copy" -a -m -e target_tag
 options::add -o r -d "Source registry to find images" -a -m -e target_registry
 options::add -o a -d "target registry url to copy to, may be repeated" -a -m -f _add_additional_registry
@@ -40,12 +44,14 @@ if [ "$DRY_RUN" = "true" ]; then
   export SIMULATE=true
 fi
 
+RELEASE_IMAGES_ORG=${RELEASE_IMAGES_ORG:-blockchaintp}
+
 if [ -z "$IMAGES_FILE" ]; then
   # docker::promote_latest accepts variadic extras after shift 3, so call
   # it once with every additional_registry instead of looping — this
   # collapses N redundant pulls per repo into one (60 pulls -> 20 across
   # a 30-repo / 3-extra-registry org).
-  docker::promote_latest blockchaintp "${target_registry:?}" \
+  docker::promote_latest "$RELEASE_IMAGES_ORG" "${target_registry:?}" \
     "${target_tag:?}" \
     "${additional_registries[@]}"
 else

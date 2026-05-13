@@ -25,7 +25,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 log::level 2
 options::standard
-options::description "Creates PagerDuty alert (incident)"
+options::description "Creates PagerDuty alert (incident). When -f is not\
+ supplied the From address defaults to the value of PAGERDUTY_FROM_DEFAULT\
+ (historical default: \"no-reply@blockchaintp.com\")."
 options::add -o a -d "Alert API Token" -a -m -e ALERT_TOKEN
 options::add -o s -d "PagerDuty ServiceID" -a -m -e SERVICE_ID
 options::add -o i -d "Alert Type (incident)" -a -m -e ALERT_TYPE
@@ -35,7 +37,7 @@ options::add -o f -d "Alert From Email Address" -a -e ALERT_FROM
 options::parse_available "$@"
 
 ALERT_TITLE=${ALERT_TITLE:="Test Alert"}
-ALERT_FROM=${ALERT_FROM:="no-reply@blockchaintp.com"}
+ALERT_FROM=${ALERT_FROM:="${PAGERDUTY_FROM_DEFAULT:-no-reply@blockchaintp.com}"}
 
 case $ALERT_TYPE in
   incident)

@@ -24,7 +24,9 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 
 options::standard
 options::description "Add a new tag to the repository based on semver and\
- conventional commits."
+ conventional commits. Annotated tags are GPG-signed (git tag -s), which\
+ requires a configured signing key (user.signingkey + gpg-agent or\
+ equivalent); pass -U to write an unsigned annotated tag instead."
 options::add -o t -d "target directory to examine and update" -a -m \
   -e TARGET_DIR
 options::add -o p -d "Patch tag" \
@@ -33,6 +35,8 @@ options::add -o b -d "proceed to bump minor version if breaking changes are foun
   -x ALLOW_BREAKING
 options::add -o c -d "generate and commit change before tagging" \
   -x GENERATE_CHANGELOG
+options::add -o U -d "skip GPG signing of the annotated tag" \
+  -x NO_SIGN_TAG
 options::parse "$@"
 
 pushd "$TARGET_DIR" >/dev/null || exit 1
@@ -128,7 +132,11 @@ if [ "$skip" = "false" ]; then
         log::notice "No prior changelog found. Will not generate a new one."
       fi
     fi
-    git::cmd tag -a -s "$TAG" -m "Auto Tagging $TAG"
+    if [ "$NO_SIGN_TAG" = "true" ]; then
+      git::cmd tag -a "$TAG" -m "Auto Tagging $TAG"
+    else
+      git::cmd tag -a -s "$TAG" -m "Auto Tagging $TAG"
+    fi
   fi
 fi
 popd >/dev/null || exit 1

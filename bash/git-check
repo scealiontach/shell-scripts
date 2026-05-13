@@ -37,7 +37,12 @@ function set_client() {
 
 options::standard
 options::description "Check all the repositories according to the\
- parameters and update keep them in sync with the origin if possible"
+ parameters and update keep them in sync with the origin if possible.\
+ GH_PR_CHECK is only consulted for orgs in GIT_CHECK_GH_ORGS\
+ (space-separated; default \"blockchaintp catenasys scealiontach\");\
+ BitBucket PR counts are only fetched for orgs in GIT_CHECK_BB_ORGS\
+ (default \"TASE\"). Override either to extend the toolkit beyond the\
+ historical BTP setup."
 options::add -o o -d "organization to scan" -a -f set_organization
 options::add -o b -d "base directory to scan" -a -e BASE
 options::add -o p -d "check for pull requests" -x GH_PR_CHECK
@@ -92,8 +97,16 @@ function get_gh_pr_count {
     return
   fi
   if command -v gh >/dev/null; then
-    if [ "$orgname" = "blockchaintp" ] ||
-      [ "$orgname" = "catenasys" ] || [ "$orgname" = "scealiontach" ]; then
+    local gh_orgs=${GIT_CHECK_GH_ORGS:-"blockchaintp catenasys scealiontach"}
+    local org
+    local match=false
+    for org in $gh_orgs; do
+      if [ "$orgname" = "$org" ]; then
+        match=true
+        break
+      fi
+    done
+    if [ "$match" = "true" ]; then
       log::debug "Checking pull requests for $base_name"
       gh pr list -R "$base_name" --draft=false | grep -cv "no open"
     else
@@ -114,7 +127,16 @@ function get_bb_pr_count {
     return
   fi
   if command -v bb >/dev/null; then
-    if [ "$orgname" = "TASE" ]; then
+    local bb_orgs=${GIT_CHECK_BB_ORGS:-TASE}
+    local org
+    local match=false
+    for org in $bb_orgs; do
+      if [ "$orgname" = "$org" ]; then
+        match=true
+        break
+      fi
+    done
+    if [ "$match" = "true" ]; then
       log::debug "Checking pull requests for $base_name"
       bb -c "$orgname" pr-count "$base_name"
     else

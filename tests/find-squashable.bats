@@ -51,3 +51,34 @@ teardown() {
   [ "$status" -eq 0 ]
   [[ "$output" == *"could be squashed"* ]]
 }
+
+# SUR-2840: when a same-files run extends to the oldest commit in the
+# iteration range, the historical emit branch never fired because it
+# required a different following commit. Build a history where every
+# in-range commit touches the same file and assert the trailing group is
+# still reported.
+@test "find-squashable flushes a same-files group that extends to the last commit (SUR-2840)" {
+  TAIL_FIXTURE=$(mktemp -d)
+  (
+    cd "$TAIL_FIXTURE" || exit 1
+    git init -q -b main .
+    helpers::set_git_identity
+    echo "initial" >file_a.txt
+    git add file_a.txt
+    git -c commit.gpgsign=false commit -q -m "feat: initial"
+    echo "c1" >>file_a.txt
+    git add file_a.txt
+    git -c commit.gpgsign=false commit -q -m "feat: change file_a 1"
+    echo "c2" >>file_a.txt
+    git add file_a.txt
+    git -c commit.gpgsign=false commit -q -m "feat: change file_a 2"
+    echo "c3" >>file_a.txt
+    git add file_a.txt
+    git -c commit.gpgsign=false commit -q -m "feat: change file_a 3"
+  )
+  TAIL_START=$(git -C "$TAIL_FIXTURE" rev-list --reverse HEAD | head -1)
+  run bash -c "cd '$TAIL_FIXTURE' && '$SQUASHABLE' -s '$TAIL_START'"
+  rm -rf "$TAIL_FIXTURE"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"could be squashed"* ]]
+}

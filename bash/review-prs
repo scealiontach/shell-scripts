@@ -22,7 +22,11 @@ function usage() {
   true
 }
 options::standard
-options::description "Opens a browser to review all pull requests for the specified organizations."
+options::description "Opens a browser to review all pull requests for the\
+ specified organizations. If no -o orgs are given, the default organization\
+ list comes from REVIEW_PRS_ORGS (space-separated; historical default is\
+ \"391agency btpworks blockchaintp catenasys\"). REVIEW_PRS_INTEREST_ORGS\
+ plays the same role for -i."
 
 declare -a -g ORGANIZATIONS
 function local::add_organization {
@@ -47,12 +51,19 @@ shift $((OPTIND - 1))
 
 OPEN_BROWSER=${OPEN_BROWSER:-false}
 GIT_HOME=${GIT_HOME:-$HOME/git}
+# SUR-2832: defaults preserved for the BTP-era invocation; override
+# REVIEW_PRS_ORGS / REVIEW_PRS_INTEREST_ORGS (space-separated) to scan
+# different organizations without editing the script.
+REVIEW_PRS_ORGS=${REVIEW_PRS_ORGS:-"391agency btpworks blockchaintp catenasys"}
+REVIEW_PRS_INTEREST_ORGS=${REVIEW_PRS_INTEREST_ORGS:-hyperledger}
 if [ -z "${INTERESTED_ORGANIZATIONS[*]}" ]; then
-  INTERESTED_ORGANIZATIONS+=(hyperledger)
+  # shellcheck disable=SC2206 # intentional word-splitting on space-separated env var
+  INTERESTED_ORGANIZATIONS+=(${REVIEW_PRS_INTEREST_ORGS})
 fi
 
 if [ -z "${ORGANIZATIONS[*]}" ]; then
-  ORGANIZATIONS+=(391agency btpworks blockchaintp catenasys)
+  # shellcheck disable=SC2206 # intentional word-splitting on space-separated env var
+  ORGANIZATIONS+=(${REVIEW_PRS_ORGS})
 fi
 
 function review_prs {
