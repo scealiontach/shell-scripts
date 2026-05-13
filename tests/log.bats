@@ -147,6 +147,22 @@ probe_level() {
   [[ "$out" == "INFO=true" ]]
 }
 
+# SUR-2855 / SUR-2843: LOG_LEVEL=0 normally disables all verbose
+# levels, but source-time defaults must not overwrite caller pre-sets.
+@test "log.sh preserves caller LOG_DISABLE_* overrides when LOG_LEVEL=0 (SUR-2347 SUR-2843)" {
+  out=$(bash -c "
+    LOG_DISABLE_TRACE=false
+    LOG_DISABLE_DEBUG=false
+    LOG_DISABLE_INFO=false
+    LOG_DISABLE_WARNING=false
+    LOG_LEVEL=0
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    echo \"TRACE=\$LOG_DISABLE_TRACE DEBUG=\$LOG_DISABLE_DEBUG INFO=\$LOG_DISABLE_INFO WARNING=\$LOG_DISABLE_WARNING\"
+  ")
+  [[ "$out" == "TRACE=false DEBUG=false INFO=false WARNING=false" ]]
+}
+
 # When no flag is pre-set, behaviour matches the existing baseline:
 # log::level "$LOG_LEVEL" populates all four.
 @test "log.sh source-time init matches log::level when nothing pre-set (SUR-2347)" {
@@ -157,6 +173,16 @@ probe_level() {
     echo \"TRACE=\$LOG_DISABLE_TRACE DEBUG=\$LOG_DISABLE_DEBUG INFO=\$LOG_DISABLE_INFO WARNING=\$LOG_DISABLE_WARNING\"
   ")
   [[ "$out" == "TRACE=true DEBUG=true INFO=false WARNING=false" ]]
+}
+
+@test "log.sh source-time init derives LOG_LEVEL=0 defaults with no caller overrides (SUR-2855)" {
+  out=$(bash -c "
+    LOG_LEVEL=0
+    source '$REPO_ROOT/bash/includer.sh'
+    @include log
+    echo \"TRACE=\$LOG_DISABLE_TRACE DEBUG=\$LOG_DISABLE_DEBUG INFO=\$LOG_DISABLE_INFO WARNING=\$LOG_DISABLE_WARNING\"
+  ")
+  [[ "$out" == "TRACE=true DEBUG=true INFO=true WARNING=true" ]]
 }
 
 # SUR-2331: log::_format substitutes %MESSAGE last so a literal

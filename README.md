@@ -128,7 +128,7 @@ Published targets:
 | `build` | Compile / assemble artefacts |
 | `test` | Run bats library specs and sprint regression scripts |
 | `package` | Build all three tarballs into `dist/` |
-| `analyze` | Run FOSSA licence analysis (requires `FOSSA_API_KEY`) |
+| `analyze` | Explicit no-op kept for CI compatibility |
 | `archive` | Upload artefacts to a release archive |
 | `publish` | Tag-driven `gh release` upload (see `RELEASABLE` below) |
 | `gh-create-draft-release` | Create a draft GitHub release |
@@ -138,5 +138,3 @@ Published targets:
 tag (`LONG_VERSION != VERSION` because `git describe --long` always appends
 the commit-count suffix) **and** the working tree is clean. `make publish`
 gate-checks this flag before uploading.
-
-The toolchain image is `blockchaintp/toolchain:latest`.
