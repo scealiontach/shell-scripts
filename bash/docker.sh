@@ -25,7 +25,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/includer.sh"
 @package docker
 
 function docker::cmd() {
-  @doc Smart command for docker.
+  @doc Smart command for docker. \
+    When the SIMULATE environment variable is non-empty every docker \
+    invocation is echoed to stdout instead of executed. release-images -d \
+    sets SIMULATE=true to provide a dry-run mode and callers that want \
+    the same behaviour for ad-hoc scripts can export SIMULATE themselves.
   if [ -z "$SIMULATE" ]; then
     $(commands::use docker) "$@"
   else
