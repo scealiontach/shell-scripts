@@ -29,25 +29,42 @@ options::parse "$@"
 
 previous_cmt=
 previous_files=
-first_squash="true"
+group_open=false
+group_first=
+# SUR-2840: separate `group_open` (bool) from `group_first` (SHA) so the
+# state isn't overloaded onto one sentinel. Cache git::files_changed |
+# cksum once per iteration and flush a trailing same-files group after
+# the loop — pre-fix, a group that ran to the oldest commit in range
+# never printed because the emit branch only fired on a different
+# following commit.
 for cmt in $(git::commits "$START_FROM" "$END_AT"); do
+  these_files=$(git::files_changed "$cmt" | cksum)
   if [ -n "$previous_cmt" ]; then
-    these_files=$(git::files_changed "$cmt" | cksum)
     if [ "$these_files" = "$previous_files" ]; then
-      if [ "$first_squash" = "true" ]; then
-        first_squash=$previous_cmt
+      if [ "$group_open" = "false" ]; then
+        group_first=$previous_cmt
+        group_open=true
       fi
     else
-      if [ "$first_squash" != "true" ]; then
+      if [ "$group_open" = "true" ]; then
         echo
-        echo "$first_squash" to "$previous_cmt" could be squashed
-        git::log_fromto "${previous_cmt}~1" "$first_squash"
+        echo "$group_first" to "$previous_cmt" could be squashed
+        git::log_fromto "${previous_cmt}~1" "$group_first"
         echo
         git::files_changed "$previous_cmt"
+        group_open=false
+        group_first=
       fi
-      first_squash="true"
     fi
   fi
   previous_cmt=$cmt
-  previous_files=$(git::files_changed "$cmt" | cksum)
+  previous_files=$these_files
 done
+
+if [ "$group_open" = "true" ]; then
+  echo
+  echo "$group_first" to "$previous_cmt" could be squashed
+  git::log_fromto "${previous_cmt}~1" "$group_first"
+  echo
+  git::files_changed "$previous_cmt"
+fi
