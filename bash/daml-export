@@ -164,6 +164,19 @@ function build {
   popd >/dev/null || return 1
 }
 
+# SUR-2838 test seam: when sourced from bats, skip the main entry
+# point so individual helpers can be exercised in isolation. Mirrors
+# the K8S_SUPPORT_COLLECTOR_SOURCE_ONLY guard. Defaults to executing
+# the main loop when the env var is unset, so unwrapped invocations
+# (including tests/sur-1871-daml-export.sh) are unchanged.
+if [ "${DAML_EXPORT_SOURCE_ONLY:-}" = "true" ]; then
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 0
+  else
+    exit 0
+  fi
+fi
+
 CUR_INT=$(hex_to_dec "$START_OFFSET")
 STOP_INT=$(hex_to_dec "$STOP_OFFSET")
 
