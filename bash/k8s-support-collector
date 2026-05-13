@@ -71,6 +71,11 @@ function describe_pods {
   local out_dir_ns="${OUT_DIR}/$ns"
   log::notice "Describing pods for namespace $ns"
   dirs::ensure "$out_dir_ns"
+  # SUR-2844: load-bearing. `k8s::get_pod_names` returns the literal
+  # `pod/<name>` form from `kubectl get pods -o name`, so the redirect
+  # below expands to `$out_dir_ns/pod/<name>.describe`. Dropping this
+  # `dirs::ensure` (as the original issue suggested) breaks the redirect
+  # with "No such file or directory" — keep it.
   dirs::ensure "$out_dir_ns/pod"
   for pod in $(k8s::get_pod_names -n "$ns"); do
     k8s::describe -n "$ns" "$pod" >"${out_dir_ns}/$pod.describe"
