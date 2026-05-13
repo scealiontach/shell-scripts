@@ -31,18 +31,27 @@ options::add -o n -d "namespace to query (default: current context)" -a -e NAMES
 options::parse "$@"
 
 log::info "Copying keys from pods with label $LABEL"
+# SUR-2827: mirror fetch-all-pod-logs by building ns_args once and forwarding
+# it to every kubectl invocation. Before this fix, only the initial
+# k8s::pod_names_for_label call honoured -n NAMESPACE; the downstream
+# get-pod and cp calls silently ran against the current-context default
+# namespace, which would copy the wrong (or no) key material.
+ns_args=()
+if [ -n "${NAMESPACE:-}" ]; then
+  ns_args=(-n "$NAMESPACE")
+fi
 while IFS= read -r pod; do
   [[ -z "$pod" ]] && continue
-  node_name=$(k8s::ctl get pod "$pod" -o json | $(commands::use jq) -r '.spec.nodeName')
+  node_name=$(k8s::ctl get pod "${ns_args[@]}" "$pod" -o json | $(commands::use jq) -r '.spec.nodeName')
   log::info "Working on $node_name with pod $pod"
   mkdir -p "keys/$node_name"
   ln -snf "$node_name" "keys/$pod"
-  if ! exec::capture k8s::ctl cp "$pod:/etc/sawtooth/keys/validator.priv" \
+  if ! exec::capture k8s::ctl cp "${ns_args[@]}" "$pod:/etc/sawtooth/keys/validator.priv" \
     "keys/$node_name/validator.priv" -c validator; then
     log::error "kubectl cp failed for pod $pod (validator.priv)"
     exit 1
   fi
-  if ! exec::capture k8s::ctl cp "$pod:/etc/sawtooth/keys/validator.pub" \
+  if ! exec::capture k8s::ctl cp "${ns_args[@]}" "$pod:/etc/sawtooth/keys/validator.pub" \
     "keys/$node_name/validator.pub" -c validator; then
     log::error "kubectl cp failed for pod $pod (validator.pub)"
     exit 1
