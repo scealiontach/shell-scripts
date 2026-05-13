@@ -213,18 +213,37 @@ function docker::list_tags {
 }
 
 function docker::list_versions {
+  @doc List repository tags matching the version pattern, sorted by \
+    semver. The pattern defaults to the historical BTP regex. \
+    Override by passing an explicit pattern argument or by setting \
+    DOCKER_VERSION_PATTERN in the environment. SUR-2832.
+  @arg _1_ repository name
+  @arg _2_ registry url
+  @arg _3_ optional ERE pattern - defaults to historical BTP regex or DOCKER_VERSION_PATTERN
   local repository=${1:?}
   local registry=${2?}
+  local default_pattern='BTP[0-9]+.[0-9]+.[0-9]+(rc[0-9]+)?(-[0-9]+-[a-z0-9]{8,10})?(-[0-9]+.[0-9]+.[0-9]+(p[0-9]+(-[0-9]+-[a-z0-9]{8,10})?)?)?'
+  local pattern=${3:-${DOCKER_VERSION_PATTERN:-$default_pattern}}
   docker::list_tags "$repository" "$registry" |
-    grep -E 'BTP[0-9]+.[0-9]+.[0-9]+(rc[0-9]+)?(-[0-9]+-[a-z0-9]{8,10})?(-[0-9]+.[0-9]+.[0-9]+(p[0-9]+(-[0-9]+-[a-z0-9]{8,10})?)?)?' |
+    grep -E "$pattern" |
     sort -V
 }
 
 function docker::list_official_versions {
+  @doc List repository tags matching the official-release pattern, \
+    sorted by semver. The pattern defaults to the historical BTP \
+    anchored regex. Override by passing an explicit pattern argument or \
+    by setting DOCKER_OFFICIAL_VERSION_PATTERN in the environment. \
+    SUR-2832.
+  @arg _1_ repository name
+  @arg _2_ registry url
+  @arg _3_ optional ERE pattern - defaults to anchored BTP regex or DOCKER_OFFICIAL_VERSION_PATTERN
   local repository=${1:?}
   local registry=${2?}
-  docker::list_tags "$repository" "$registry" | grep -E \
-    '^BTP[0-9]+.[0-9]+.[0-9]+(rc[0-9]+)?(-[0-9]+.[0-9]+.[0-9]+(p[0-9]+)?)?$' |
+  local default_pattern='^BTP[0-9]+.[0-9]+.[0-9]+(rc[0-9]+)?(-[0-9]+.[0-9]+.[0-9]+(p[0-9]+)?)?$'
+  local pattern=${3:-${DOCKER_OFFICIAL_VERSION_PATTERN:-$default_pattern}}
+  docker::list_tags "$repository" "$registry" |
+    grep -E "$pattern" |
     sort -V
 }
 

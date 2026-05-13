@@ -46,10 +46,26 @@ function aws::get_tags {
 }
 
 function aws::scan {
+  @doc Iterate over every ECR repository and refresh the scan for the \
+    given tag, skipping any repository named in AWS_SCAN_SKIP_REPOS. \
+    AWS_SCAN_SKIP_REPOS is comma-separated and defaults to \
+    blockchaintp/busybox, preserving the historical BTP behaviour. \
+    SUR-2832.
+  @arg _1_ tag to scan - when empty every tag is rescanned
   local tag=$1
+  local skip_list=${AWS_SCAN_SKIP_REPOS:-blockchaintp/busybox}
   for repository in $(aws::get_repositories); do
-    if [ "$repository" = "blockchaintp/busybox" ]; then
-      log::info "Skipping busybox repository"
+    local skip
+    local match=false
+    IFS=',' read -ra skip <<<"$skip_list"
+    for skip_entry in "${skip[@]}"; do
+      if [ "$repository" = "$skip_entry" ]; then
+        match=true
+        break
+      fi
+    done
+    if [ "$match" = "true" ]; then
+      log::info "Skipping $repository repository (AWS_SCAN_SKIP_REPOS)"
       continue
     fi
     log::info "Scanning $repository $tag"
