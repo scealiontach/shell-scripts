@@ -165,6 +165,41 @@ setup() {
   [ "$output" = "hello" ]
 }
 
+# SUR-2831: exec::capture must not install a RETURN trap that leaks into
+# the caller's scope. The previous `trap 'rm -f "$tmpout"' RETURN` was
+# never cleared, occupied the trap slot permanently, and overwrote any
+# caller-installed RETURN trap (last-writer-wins).
+
+@test "exec::capture leaves no RETURN trap installed in caller scope (SUR-2831)" {
+  out=$(bash -c "
+    LOGFILE='\$HOME/exec.log'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    caller() {
+      exec::capture true >/dev/null
+      trap -p RETURN
+    }
+    caller
+  ")
+  [ -z "$out" ]
+}
+
+@test "exec::capture does not clobber a caller-installed RETURN trap (SUR-2831)" {
+  SENTINEL="$BATS_TEST_TMPDIR/return-sentinel"
+  rm -f "$SENTINEL"
+  bash -c "
+    LOGFILE='\$HOME/exec.log'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include exec
+    caller() {
+      trap 'touch \"$SENTINEL\"' RETURN
+      exec::capture true >/dev/null
+    }
+    caller
+  "
+  [ -f "$SENTINEL" ]
+}
+
 @test "exec::capture populates exec_output via the tee branch" {
   run bash -c "
     LOGFILE='$HOME/exec-tee-output.log'
