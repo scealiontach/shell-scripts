@@ -29,7 +29,20 @@ shift "$((OPTIND - 1))"
 
 function ::get_includes() {
   local file=${1:?}
-  grep "^@include" "$file" | awk '{print $NF}'
+  # SUR-2842: anchor on a literal `@include` directive followed by at
+  # least one whitespace character, strip any trailing `# comment`, and
+  # emit the include name (field 2). The previous implementation
+  # (`grep "^@include" | awk '{print $NF}'`) misparsed three concrete
+  # shapes: trailing-comment lines surfaced the ticket-name token,
+  # multi-arg lines surfaced the trailing token, and a bare `@include`
+  # with no argument fed an empty string downstream into
+  # `includer::find`.
+  awk '
+    /^@include[[:space:]]+/ {
+      sub(/[[:space:]]*#.*/, "")
+      if (NF >= 2) { print $2 }
+    }
+  ' "$file"
 }
 
 function get_all_includes() {
