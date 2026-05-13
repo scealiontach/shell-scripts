@@ -86,29 +86,16 @@ function log::level() {
   LOG_LEVEL=$level
 }
 
-# Initialise the LOG_DISABLE_* flags from LOG_LEVEL at source time so
-# scripts that don't pass -v still get deterministic gating. Each flag is
-# initialised independently: SUR-2347 — pre-fix, if a caller pre-set any
-# single flag (e.g. LOG_DISABLE_INFO=false) the entire block was skipped,
-# leaving the other three unset (empty), and `[ "$LOG_DISABLE_TRACE" =
-# "false" ]` evaluated false, silently disabling output. Snapshot the
-# caller's explicit pre-sets, let log::level recompute defaults from
-# LOG_LEVEL, then restore the snapshots so explicit values win.
-__log_preset_trace=${LOG_DISABLE_TRACE+x}
-__log_preset_debug=${LOG_DISABLE_DEBUG+x}
-__log_preset_info=${LOG_DISABLE_INFO+x}
-__log_preset_warning=${LOG_DISABLE_WARNING+x}
-__log_value_trace=${LOG_DISABLE_TRACE-}
-__log_value_debug=${LOG_DISABLE_DEBUG-}
-__log_value_info=${LOG_DISABLE_INFO-}
-__log_value_warning=${LOG_DISABLE_WARNING-}
-log::level "$LOG_LEVEL"
-[ "$__log_preset_trace" = x ] && LOG_DISABLE_TRACE=$__log_value_trace
-[ "$__log_preset_debug" = x ] && LOG_DISABLE_DEBUG=$__log_value_debug
-[ "$__log_preset_info" = x ] && LOG_DISABLE_INFO=$__log_value_info
-[ "$__log_preset_warning" = x ] && LOG_DISABLE_WARNING=$__log_value_warning
-unset __log_preset_trace __log_preset_debug __log_preset_info __log_preset_warning
-unset __log_value_trace __log_value_debug __log_value_info __log_value_warning
+# Initialise each LOG_DISABLE_* flag from LOG_LEVEL at source time,
+# honouring any caller pre-set. The ${VAR+x} guard treats an explicit
+# pre-set as authoritative; only unset flags are computed from
+# LOG_LEVEL. log::level (above) still recomputes unconditionally, which
+# is what log::level_increase / log::level_decrease rely on.
+# (SUR-2347; simplified SUR-2843)
+[ -z "${LOG_DISABLE_TRACE+x}" ] && { ((LOG_LEVEL > 3)) && LOG_DISABLE_TRACE=false || LOG_DISABLE_TRACE=true; }
+[ -z "${LOG_DISABLE_DEBUG+x}" ] && { ((LOG_LEVEL > 2)) && LOG_DISABLE_DEBUG=false || LOG_DISABLE_DEBUG=true; }
+[ -z "${LOG_DISABLE_INFO+x}" ] && { ((LOG_LEVEL > 1)) && LOG_DISABLE_INFO=false || LOG_DISABLE_INFO=true; }
+[ -z "${LOG_DISABLE_WARNING+x}" ] && { ((LOG_LEVEL > 0)) && LOG_DISABLE_WARNING=false || LOG_DISABLE_WARNING=true; }
 
 function log::level_increase() {
   @doc Increase the LOG_LEVEL
