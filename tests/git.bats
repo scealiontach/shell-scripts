@@ -84,6 +84,22 @@ run_projecturl_with_remote() {
   [ "$out" = "$EXPECTED" ]
 }
 
+# SUR-2828: git::project_url must resolve `origin` exactly, not any remote
+# whose name starts with "origin" (e.g. origin-fork).
+
+@test "git::project_url ignores origin-fork remote (SUR-2828)" {
+  out=$(bash -c "
+    cd '$REPO' &&
+      git remote remove origin 2>/dev/null
+    git remote add origin 'git@github.com:scealiontach/shell-scripts.git'
+    git remote add origin-fork 'git@github.com:someoneelse/shell-scripts-fork.git'
+    source '$REPO_ROOT/bash/includer.sh'
+    @include git
+    git::project_url
+  ")
+  [ "$out" = "https://github.com/scealiontach/shell-scripts" ]
+}
+
 # SUR-2454: git::tagsinhistory replaced with git for-each-ref
 
 @test "git::tagsinhistory returns one tag per line in newest-first order (SUR-2454)" {

@@ -31,13 +31,16 @@ function exec::capture() {
     local logfile=${LOGFILE:-"exec.log"}
     local tmpout
     tmpout=$(mktemp)
-    trap 'rm -f "$tmpout"' RETURN
+    # SUR-2831: clean tmpout up inline. The previous `trap ... RETURN`
+    # installation persisted into the caller's scope (last-writer-wins),
+    # silently clobbering any caller-installed RETURN trap.
     # Stream to caller stdout in real-time; second tee captures into tmpout.
     "$@" 2>&1 | tee -a "$logfile" | tee "$tmpout"
     exit_code=${PIPESTATUS[0]}
     # exec_output is an intentional output variable (no local) — callers read it.
     # shellcheck disable=SC2034
     exec_output=$(<"$tmpout")
+    rm -f "$tmpout"
   else
     # exec_output is an intentional output variable (no local) — callers read it.
     # shellcheck disable=SC2034

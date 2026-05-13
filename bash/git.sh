@@ -55,10 +55,17 @@ function git::project_url() {
   @doc Return the bare project URL: https://github.com/owner/repo
   @doc No trailing /commit suffix. Emits empty string for non-GitHub remotes.
   local origin_url
-  origin_url=$(git remote -v | grep "^origin" | head -1)
+  # SUR-2828: resolve `origin` exactly. The previous `grep "^origin"` matched
+  # `origin-fork`, `origin-mirror`, `origin2`, etc., and `head -1` over the
+  # interleaved `git remote -v` output was non-deterministic when multiple
+  # remotes were configured.
+  origin_url=$(git config --get remote.origin.url 2>/dev/null)
+  if [ -z "$origin_url" ]; then
+    origin_url=$(git remote -v | awk '$1=="origin" && $3=="(fetch)" {print $2; exit}')
+  fi
   if echo "$origin_url" | grep -q github; then
     local slug
-    slug=$(echo "$origin_url" | awk '{print $2}')
+    slug=${origin_url}
     slug=${slug//.git/}
     slug=${slug//git@github.com:/}
     slug=${slug//https:\/\/github.com\//}

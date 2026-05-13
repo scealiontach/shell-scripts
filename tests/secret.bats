@@ -143,6 +143,28 @@ setup() {
   [ "$out" = "quoted-trap-fired" ]
 }
 
+# SUR-2830: secret::clear must use array length, not [0]. A sparse array
+# (element 0 unset, later indices populated) previously made the guard
+# fail and the cleanup silently no-op, leaving 0600 tempfiles with secret
+# material under $TMPDIR.
+@test "secret::clear removes tempfiles when SECRET_TMPFILES[0] is unset (SUR-2830)" {
+  PROBE_DIR="$BATS_TEST_TMPDIR/sparse"
+  mkdir -p "$PROBE_DIR"
+  a="$PROBE_DIR/a"
+  b="$PROBE_DIR/b"
+  : >"$a"
+  : >"$b"
+  bash -c "
+    source '$REPO_ROOT/bash/includer.sh'
+    @include secret
+    SECRET_TMPFILES=('$a' '$b')
+    unset 'SECRET_TMPFILES[0]'
+    secret::clear
+  "
+  [ ! -e "$a" ] || [ ! -e "$b" ] # at least the surviving index was removed
+  [ ! -e "$b" ]
+}
+
 # SUR-2324: idempotency — installing twice must not stack chained calls.
 @test "secret::_install_cleanup_trap is idempotent within a shell (SUR-2324)" {
   SENTINEL="$BATS_TEST_TMPDIR/idempotent-sentinel"
