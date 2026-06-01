@@ -23,6 +23,26 @@ setup() {
   export DAML_EXPORT_SOURCE_ONLY=true
 }
 
+function write_daml_stub() {
+  local stub_bin=${1:?}
+  cat >"$stub_bin/daml" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "build" ]; then
+  echo "start:$PWD" >>"${DAML_STUB_LOG:?}"
+  trap 'echo "killed:$PWD" >>"${DAML_STUB_LOG:?}"; exit 143' TERM INT
+  sleep "${DAML_BUILD_SLEEP:-1}"
+  if [ -n "${DAML_BUILD_FAIL_DIR:-}" ] && [[ "$PWD" == *"${DAML_BUILD_FAIL_DIR}" ]]; then
+    echo "fail:$PWD" >>"${DAML_STUB_LOG:?}"
+    exit 7
+  fi
+  echo "done:$PWD" >>"${DAML_STUB_LOG:?}"
+  exit 0
+fi
+exit 0
+EOF
+  chmod +x "$stub_bin/daml"
+}
+
 @test "DAML_EXPORT_SOURCE_ONLY exits 0 when executed (no main body) (SUR-2838)" {
   out=$(mktemp -d)
   run env DAML_EXPORT_SOURCE_ONLY=true bash "$DAML_EXPORT" -d "$out" -e ffff
@@ -163,4 +183,70 @@ EOF
   run ! grep -q "import qualified DA.Internal.Template$" "$tmp/Export.daml"
   grep -q "^archiveCmd foo$" "$tmp/Export.daml"
   rm -rf "$tmp"
+}
+
+@test "daml-export waits for in-flight background builds on normal exit (SUR-3352)" {
+  tmp=$(mktemp -d)
+  stub_bin=$(mktemp -d)
+  log_file=$(mktemp)
+  write_daml_stub "$stub_bin"
+
+  dir="$tmp/0000000000000000-0000000000000001"
+  mkdir -p "$dir"
+  touch "$dir/export.good" "$dir/Export.daml"
+  cat >"$dir/daml.yaml" <<'EOF'
+build-options: ["--target=1.14"]
+EOF
+
+  run env PATH="$stub_bin:$PATH" DAML_STUB_LOG="$log_file" DAML_BUILD_SLEEP=1 DAML_EXPORT_SOURCE_ONLY= \
+    bash "$DAML_EXPORT" -d "$tmp" -b 0 -e 1 -s 1 -P 5
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$log_file")" == *"done:$dir"* ]]
+  run ! grep -q "^killed:" "$log_file"
+  rm -rf "$tmp" "$stub_bin"
+  rm -f "$log_file"
+}
+
+@test "daml-export propagates background build failure to exit status (SUR-3352)" {
+  tmp=$(mktemp -d)
+  stub_bin=$(mktemp -d)
+  log_file=$(mktemp)
+  write_daml_stub "$stub_bin"
+
+  dir="$tmp/0000000000000000-0000000000000001"
+  mkdir -p "$dir"
+  touch "$dir/export.good" "$dir/Export.daml"
+  cat >"$dir/daml.yaml" <<'EOF'
+build-options: ["--target=1.14"]
+EOF
+
+  run env PATH="$stub_bin:$PATH" DAML_STUB_LOG="$log_file" DAML_BUILD_SLEEP=1 DAML_EXPORT_SOURCE_ONLY= \
+    DAML_BUILD_FAIL_DIR="0000000000000000-0000000000000001" \
+    bash "$DAML_EXPORT" -d "$tmp" -b 0 -e 1 -s 1 -P 5
+  [ "$status" -ne 0 ]
+  [[ "$(cat "$log_file")" == *"fail:$dir"* ]]
+  rm -rf "$tmp" "$stub_bin"
+  rm -f "$log_file"
+}
+
+@test "daml-export does not schedule duplicate builds for same output dir (SUR-3352)" {
+  tmp=$(mktemp -d)
+  stub_bin=$(mktemp -d)
+  log_file=$(mktemp)
+  write_daml_stub "$stub_bin"
+
+  dir="$tmp/0000000000000000-0000000000000001"
+  mkdir -p "$dir"
+  touch "$dir/export.good" "$dir/Export.daml"
+  cat >"$dir/daml.yaml" <<'EOF'
+build-options: ["--target=1.14"]
+EOF
+
+  run env PATH="$stub_bin:$PATH" DAML_STUB_LOG="$log_file" DAML_BUILD_SLEEP=1 DAML_EXPORT_SOURCE_ONLY= \
+    bash "$DAML_EXPORT" -d "$tmp" -b 0 -e 1 -s 1 -P 5
+  [ "$status" -eq 0 ]
+  starts=$(grep -c "^start:$dir" "$log_file" || true)
+  [ "$starts" -eq 1 ]
+  rm -rf "$tmp" "$stub_bin"
+  rm -f "$log_file"
 }
