@@ -11,3 +11,5 @@ markers
 
 .mcp.json
 .claude-sprint.env
+
+.claude/shutdown
