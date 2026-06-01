@@ -72,6 +72,20 @@ teardown() {
   [ "${!#}" = 'echo "two words"' ]
 }
 
+@test "send-keys payload includes namespace when -n is provided" {
+  run "$REPO_ROOT/bash/pod-console" -n my-ns -l app=foo -c exec -- sh -c "true"
+  [ "$status" -eq 0 ]
+
+  send_line=$(grep -a '^send-keys' "$TMUX_ARGV_LOG" | tr '\0' '\n')
+  [ -n "$send_line" ]
+  payload=$(awk 'NR==4 {print; exit}' <<<"$send_line")
+  [ -n "$payload" ]
+
+  eval "set -- $payload"
+  joined=" $* "
+  [[ "$joined" == *" -n my-ns "* ]]
+}
+
 @test "no \$* expansion remains in pod-console (excluding comments)" {
   # Strip comment-only and trailing-comment content before matching, so
   # any commentary that mentions the historical bug does not trip the

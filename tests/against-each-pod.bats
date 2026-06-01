@@ -27,6 +27,11 @@ teardown() {
   [[ "$argv" == *"--field-selector=status.phase=Running"* ]]
   [[ "$argv" == *"-o name"* ]]
   [[ "$argv" == *"-n my-ns"* ]]
+  # Every kubectl call (listing, get pod, and per-pod command) must
+  # preserve -n when the option is provided.
+  while IFS= read -r line; do
+    [[ "$line" == *" -n my-ns "* ]] || [[ "$line" == *" -n my-ns" ]]
+  done <"$KUBECTL_ARGV_LOG"
 }
 
 @test "against-each-pod without -n omits namespace from kubectl argv" {
