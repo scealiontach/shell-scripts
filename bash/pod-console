@@ -32,6 +32,10 @@ options::parse "$@"
 shift $((OPTIND - 1))
 
 SESSION=$LABEL
+NAMESPACE_ARGS=()
+if [ -n "${NAMESPACE:-}" ]; then
+  NAMESPACE_ARGS=(-n "$NAMESPACE")
+fi
 
 function tmux::cmd {
   $(commands::use tmux) "$@"
@@ -57,7 +61,7 @@ for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
   # Build the send-keys payload via printf %q so each positional arg
   # round-trips through the remote shell's tokeniser intact instead of
   # being collapsed by IFS-joined "$*". See SUR-1869.
-  payload=$(printf '%q ' "$(commands::use kubectl)" "$COMMAND" "pod/$pod" "$@")
+  payload=$(printf '%q ' "$(commands::use kubectl)" "$COMMAND" "pod/$pod" "${NAMESPACE_ARGS[@]}" "$@")
   log::debug "Execute on $SESSION: $payload"
   tmux::cmd send-keys -t "$SESSION" "$payload" C-m
   log::debug "Tile window $WINDOW"

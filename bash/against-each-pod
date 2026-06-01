@@ -35,10 +35,16 @@ LABEL=${1:?label required as first positional arg}
 shift
 COMMAND=${1:?subcommand required as second positional arg}
 shift
+
+NAMESPACE_ARGS=()
+if [ -n "${NAMESPACE:-}" ]; then
+  NAMESPACE_ARGS=(-n "$NAMESPACE")
+fi
+
 for pod in $(k8s::pod_names_for_label "$LABEL" "${NAMESPACE:-}" | sort); do
-  node_name=$(k8s::ctl get pod "$pod" -o json |
+  node_name=$(k8s::ctl get pod "$pod" "${NAMESPACE_ARGS[@]}" -o json |
     $(commands::use jq) -r '.spec.nodeName')
   echo "=== $node_name $pod ==="
-  k8s::ctl "$COMMAND" "pod/$pod" "$@"
+  k8s::ctl "$COMMAND" "pod/$pod" "${NAMESPACE_ARGS[@]}" "$@"
   echo
 done
