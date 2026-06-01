@@ -37,9 +37,13 @@ dist/doc-$(VERSION).tar.gz: $(DOC_SRC) bash/bashadoc
 
 dist/bin-$(VERSION).tar.gz: $(DOC_SRC) $(BIN_SRC) bash/pack-script
 	mkdir -p dist/bin
-	for s in $$(find bash -type f ! -name '*.sh' -exec grep -q "includer" {} \; -print); do \
+	for s in $$(find bash -maxdepth 1 -type f ! -name '*.sh' -perm -u+x -print); do \
 	  base=$$(basename $$s) ; \
-	  bash/pack-script -v -f $$s -o dist/bin/$$base ; \
+	  if grep -q "includer" $$s; then \
+	    bash/pack-script -v -f $$s -o dist/bin/$$base ; \
+	  else \
+	    cp $$s dist/bin/$$base ; \
+	  fi ; \
 	done
 	tar -zcf dist/bin-$(VERSION).tar.gz -C dist bin
 	rm -rf dist/bin
