@@ -13,3 +13,5 @@ markers
 .claude-sprint.env
 
 .claude/shutdown
+
+node_modules/
