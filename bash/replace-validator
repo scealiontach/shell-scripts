@@ -119,6 +119,26 @@ function waitForPodTermination() {
   done
 }
 
+# Pre-flight check that every requested node has a pod in the populated
+# map. Emits a clear error naming the missing node and selector and returns
+# non-zero so `main` can bail out BEFORE any key copy or label mutation,
+# rather than aborting on an opaque `nounset` error when dereferencing a
+# missing associative-array element. The map is passed by nameref. (SUR-3649)
+function validateNodesMapped() {
+  local -n _map=${1:?}
+  local label=${2:?}
+  shift 2
+  local node
+  local rc=0
+  for node in "$@"; do
+    if [ -z "${_map[$node]+set}" ]; then
+      log::error "replace-validator: no pod found for node '$node' with selector '$label'"
+      rc=1
+    fi
+  done
+  return "$rc"
+}
+
 function main() {
   set -euo pipefail
   local -A node2pod=()
@@ -128,6 +148,9 @@ function main() {
   local -A pod2node=()
   # shellcheck disable=SC2153
   mapPods "$LABEL" node2pod pod2node
+  # SUR-3649: fail cleanly before any destructive action when a requested
+  # node has no matching pod, instead of crashing on nounset below.
+  validateNodesMapped node2pod "$LABEL" "$FROM_NODE" "$TRGT_NODE"
   local from_pod=${node2pod[$FROM_NODE]}
   local to_pod=${node2pod[$TRGT_NODE]}
 

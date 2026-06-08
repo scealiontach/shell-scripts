@@ -60,3 +60,15 @@ teardown() {
   [ "$status" -eq 0 ]
   grep -qx 'stop' "$MINIKUBE_ARGV_LOG"
 }
+
+@test "create passes the default CNI to minikube start (SUR-3648)" {
+  run env "PATH=$PATH" "MINIKUBE_ARGV_LOG=$MINIKUBE_ARGV_LOG" "$MK_ENV" create
+  grep -qx 'start' "$MINIKUBE_ARGV_LOG"
+  grep -qx -- '--cni=calico' "$MINIKUBE_ARGV_LOG"
+}
+
+@test "create honors a CNI override on minikube start (SUR-3648)" {
+  run env "PATH=$PATH" "MINIKUBE_ARGV_LOG=$MINIKUBE_ARGV_LOG" CNI=cilium "$MK_ENV" create
+  grep -qx 'start' "$MINIKUBE_ARGV_LOG"
+  grep -qx -- '--cni=cilium' "$MINIKUBE_ARGV_LOG"
+}
