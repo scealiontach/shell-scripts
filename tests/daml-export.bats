@@ -52,6 +52,26 @@ EOF
   [[ "$output" != *"Exporting from offset"* ]]
 }
 
+@test "daml-export -h prints standard help (SUR-3645)" {
+  run env DAML_EXPORT_SOURCE_ONLY=true bash "$DAML_EXPORT" -h
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"SYNTAX"* ]]
+  [[ "$output" == *"daml-export [-h] [-v] -d <arg> -e <arg>"* ]]
+  [[ "$output" == *"-H <arg>"* ]]
+  [[ "$output" != *"option requires an argument -- h"* ]]
+}
+
+@test "daml-export -H sets DAML_HOST (SUR-3645)" {
+  tmp=$(mktemp -d)
+  run bash -c "
+    source '$DAML_EXPORT' -d '$tmp' -e ffff -H ledger.internal
+    printf '%s\n' \"\$DAML_HOST\"
+  "
+  rm -rf "$tmp"
+  [ "$status" -eq 0 ]
+  [ "$output" = "ledger.internal" ]
+}
+
 @test "hex_to_dec converts hex strings to decimal (SUR-2838 case 1)" {
   tmp=$(mktemp -d)
   run bash -c "

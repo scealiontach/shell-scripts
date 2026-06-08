@@ -26,7 +26,7 @@ options::add -o e -d "Stop offset(exclusive) in hex" -a -m -e STOP_OFFSET
 options::add -o P -d "maximum number of compiles to run in parallel" -a -e MAX_PARALLEL
 options::add -o b -d "Start offset in hex" -a -e START_OFFSET
 options::add -o s -d "number of offsets to cover in each export" -a -e STEPPING
-options::add -o h -d "daml host" -a -e DAML_HOST
+options::add -o H -d "daml host" -a -e DAML_HOST
 options::add -o p -d "daml port" -a -e DAML_PORT
 options::add -o t -d "daml token" -a -e DAML_TOKEN
 options::add -o z -d "acs batch size" -a -e ACS_BATCH_SIZE
