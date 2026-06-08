@@ -324,6 +324,10 @@ function command-compare() {
 }
 
 function command-diff() {
+  if [[ "$#" -ne "2" ]] || [[ -z "$1" ]] || [[ -z "$2" ]]; then
+    usage-help
+  fi
+
   validate-version "$1" v1_parts
   # shellcheck disable=SC2154
   local v1_major="${v1_parts[0]}"
