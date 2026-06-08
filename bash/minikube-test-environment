@@ -59,6 +59,7 @@ function start_or_create_minikube {
         --kubernetes-version "$KUBERNETES_VERSION" \
         --driver="$MINIKUBE_DRIVER" \
         --force-systemd=true \
+        "--cni=$CNI" \
         "--nodes=$NODES" \
         "--memory=$NODE_MEMORY"
     fi
@@ -68,6 +69,7 @@ function start_or_create_minikube {
       --kubernetes-version "$KUBERNETES_VERSION" \
       --driver="$MINIKUBE_DRIVER" \
       --force-systemd=true \
+      "--cni=$CNI" \
       "--nodes=$NODES" \
       "--memory=$NODE_MEMORY"
   fi
