@@ -46,7 +46,7 @@ options::add -o i -d "organization to scan only if we have a repo cloned. repeat
 options::add -o g -d "git repositories directory" -a -e GIT_HOME
 options::add -o w -d "open pr list in the browser" -x OPEN_BROWSER
 
-options::parse "$@"
+options::parse_available "$@"
 shift $((OPTIND - 1))
 
 OPEN_BROWSER=${OPEN_BROWSER:-false}

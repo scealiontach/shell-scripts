@@ -163,6 +163,22 @@ setup() {
   [ "$output" = "" ]
 }
 
+@test "diff with no versions prints usage instead of nounset error (SUR-3647)" {
+  run "$SEMVER" diff
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Usage:"* ]]
+  [[ "$output" == *"semver diff <version> <other_version>"* ]]
+  [[ "$output" != *"unbound variable"* ]]
+}
+
+@test "diff with one version prints usage instead of nounset error (SUR-3647)" {
+  run "$SEMVER" diff 1.2.3
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"Usage:"* ]]
+  [[ "$output" == *"semver diff <version> <other_version>"* ]]
+  [[ "$output" != *"unbound variable"* ]]
+}
+
 # ---------- get -------------------------------------------------------------
 
 @test "get major" {
