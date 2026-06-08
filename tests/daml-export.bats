@@ -249,6 +249,44 @@ EOF
   rm -f "$log_file"
 }
 
+@test "daml-export exits non-zero and skips correction/build when java export fails (SUR-3644)" {
+  tmp=$(mktemp -d)
+  stub_bin=$(mktemp -d)
+  log_file=$(mktemp)
+  write_daml_stub "$stub_bin"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 1' >"$stub_bin/java"
+  chmod +x "$stub_bin/java"
+
+  run env PATH="$stub_bin:$PATH" DAML_STUB_LOG="$log_file" DAML_EXPORT_SOURCE_ONLY= \
+    bash "$DAML_EXPORT" -d "$tmp" -b 0 -e 1 -s 1 -P 5
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"REDO"* ]]
+  # correct_export must not run on a failed export.
+  [[ "$output" != *"Correct "* ]]
+  # No build was scheduled: the daml stub never logged a start.
+  run ! grep -q "^start:" "$log_file"
+  rm -rf "$tmp" "$stub_bin"
+  rm -f "$log_file"
+}
+
+@test "daml-export exits non-zero when java succeeds but artifacts are missing (SUR-3644)" {
+  tmp=$(mktemp -d)
+  stub_bin=$(mktemp -d)
+  log_file=$(mktemp)
+  write_daml_stub "$stub_bin"
+  printf '%s\n' '#!/usr/bin/env bash' 'exit 0' >"$stub_bin/java"
+  chmod +x "$stub_bin/java"
+
+  run env PATH="$stub_bin:$PATH" DAML_STUB_LOG="$log_file" DAML_EXPORT_SOURCE_ONLY= \
+    bash "$DAML_EXPORT" -d "$tmp" -b 0 -e 1 -s 1 -P 5
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"missing required files"* ]]
+  # No build was scheduled: the daml stub never logged a start.
+  run ! grep -q "^start:" "$log_file"
+  rm -rf "$tmp" "$stub_bin"
+  rm -f "$log_file"
+}
+
 @test "daml-export does not schedule duplicate builds for same output dir (SUR-3352)" {
   tmp=$(mktemp -d)
   stub_bin=$(mktemp -d)
