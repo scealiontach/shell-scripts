@@ -59,6 +59,64 @@ EOF
   [ "$status" -eq 0 ]
 }
 
+@test "validateNodesMapped errors and exits non-zero when FROM_NODE has no pod (SUR-3649)" {
+  TEST_SCRIPT=$(mktemp)
+  cat >"$TEST_SCRIPT" <<EOF
+set -e
+source '$REPO_ROOT/bash/includer.sh'
+@include log
+
+eval "\$(awk '/^function validateNodesMapped\\(/,/^}\$/' '$TARGET')"
+
+declare -A node2pod=([node-B]=example-pod-2)
+validateNodesMapped node2pod app=foo node-A node-B
+echo "should-not-reach"
+EOF
+  run bash "$TEST_SCRIPT"
+  rm -f "$TEST_SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no pod found for node 'node-A'"* ]]
+  [[ "$output" == *"app=foo"* ]]
+  [[ "$output" != *"should-not-reach"* ]]
+}
+
+@test "validateNodesMapped errors when TRGT_NODE has no pod (SUR-3649)" {
+  TEST_SCRIPT=$(mktemp)
+  cat >"$TEST_SCRIPT" <<EOF
+set -e
+source '$REPO_ROOT/bash/includer.sh'
+@include log
+
+eval "\$(awk '/^function validateNodesMapped\\(/,/^}\$/' '$TARGET')"
+
+declare -A node2pod=([node-A]=example-pod-1)
+validateNodesMapped node2pod app=foo node-A node-B
+EOF
+  run bash "$TEST_SCRIPT"
+  rm -f "$TEST_SCRIPT"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"no pod found for node 'node-B'"* ]]
+}
+
+@test "validateNodesMapped succeeds when both nodes are mapped (SUR-3649)" {
+  TEST_SCRIPT=$(mktemp)
+  cat >"$TEST_SCRIPT" <<EOF
+set -e
+source '$REPO_ROOT/bash/includer.sh'
+@include log
+
+eval "\$(awk '/^function validateNodesMapped\\(/,/^}\$/' '$TARGET')"
+
+declare -A node2pod=([node-A]=example-pod-1 [node-B]=example-pod-2)
+validateNodesMapped node2pod app=foo node-A node-B
+echo "validated-ok"
+EOF
+  run bash "$TEST_SCRIPT"
+  rm -f "$TEST_SCRIPT"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"validated-ok"* ]]
+}
+
 @test "replace-validator declares @include commands" {
   run grep -E '^@include[[:space:]]+commands\b' "$TARGET"
   [ "$status" -eq 0 ]
